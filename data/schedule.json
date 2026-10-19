@@ -1,7 +1,19 @@
 {
-  "updatedAt": null,
+  "updatedAt": "2026-10-19T18:08:27.289Z",
   "batches": [
-    { "name": "2025", "lectures": [] },
-    { "name": "2026", "lectures": [] }
+    {
+      "name": "2025",
+      "lectures": [
+        {
+          "id": "x",
+          "day": "sat",
+          "from": "08:00",
+          "to": "09:30",
+          "subject": "اختبار النشر — رياضيات",
+          "room": "قاعة ١",
+          "doctor": "د. تجربة"
+        }
+      ]
+    }
   ]
 }

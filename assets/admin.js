@@ -14,7 +14,6 @@ const $ = (id) => document.getElementById(id);
 
 let data = null;
 let dirty = false;
-let currentBatch = null;
 let editingId = null;
 let busy = false;
 let draftWarned = false;
@@ -101,10 +100,6 @@ function toast(message, isError = false) {
   toastTimer = setTimeout(() => el.classList.remove('is-shown'), isError ? 6000 : 3200);
 }
 
-function getBatch() {
-  return data.batches.find((b) => b.name === currentBatch) || null;
-}
-
 /* ---------- GitHub ---------- */
 async function ghRequest(path, token, options = {}) {
   const res = await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/${path}`, {
@@ -181,208 +176,237 @@ function commit() {
   const saved = writeDraft({ data, dirty: true, savedAt: new Date().toISOString() });
   if (!saved && !draftWarned) {
     draftWarned = true;
-    toast('تعذّر حفظ التعديلات على هذا الجهاز. انشرها قبل إغلاق الصفحة.', true);
+    toast('ما قدرنا نحفظ التعديلات على هالجهاز. انشرها قبل ما تسكّر الصفحة.', true);
   }
   renderAll();
 }
 
 /* ---------- العرض ---------- */
 function renderAll() {
-  if (!data.batches.some((b) => b.name === currentBatch)) {
-    currentBatch = data.batches.length ? data.batches[0].name : null;
-  }
-  const batch = getBatch();
-  $('no-batches').hidden = Boolean(batch);
-  $('editor-grid').hidden = !batch;
-
-  $('tabs').innerHTML = data.batches.map((b) => `
-    <button type="button" class="btn btn-sm tab" aria-pressed="${b.name === currentBatch}" data-batch="${escapeHtml(b.name)}">${escapeHtml(b.name)}</button>`).join('');
-
-  renderDatalists();
-  if (batch) {
-    $('form-title').textContent = editingId ? `تعديل محاضرة · دفعة ${batch.name}` : `إضافة محاضرة لدفعة ${batch.name}`;
-    $('list-title').textContent = `محاضرات دفعة ${batch.name}`;
-    renderList(batch);
-  }
+  renderList();
   renderPublishBar();
   renderTokenState();
 }
 
-function renderList(batch) {
-  const list = $('lecture-list');
-  if (!batch.lectures.length) {
-    list.innerHTML = '<p class="empty">لا محاضرات بعد. أضف أول محاضرة من النموذج.</p>';
+function renderList() {
+  const lectures = data.lectures;
+  $('count-title').textContent = lectures.length ? `المحاضرات (${lectures.length})` : 'المحاضرات';
+  if (!lectures.length) {
+    $('lecture-list').innerHTML = '<div class="card state"><p>لسا ما في محاضرات. اضغط «إضافة محاضرة» لتبلش.</p></div>';
     return;
   }
-  list.innerHTML = DAYS
-    .map((d) => ({ day: d, items: batch.lectures.filter((l) => l.day === d.key) }))
+  const colors = subjectColors(lectures);
+  $('lecture-list').innerHTML = DAYS
+    .map((d) => ({ day: d, items: lectures.filter((l) => l.day === d.key) }))
     .filter((g) => g.items.length)
     .map((g) => `
-      <div class="admin-day">
+      <section class="card day-group">
         <h3>${g.day.name}</h3>
-        <ul>
-          ${g.items.map((l) => {
-            const meta = [l.room, l.doctor].filter(Boolean).map(escapeHtml).join(' · ');
-            return `
-            <li class="lec-row${l.id === editingId ? ' is-editing' : ''}">
-              <span class="t">${timeHtml(l.from)} – ${timeHtml(l.to)}</span>
-              <span class="lec-subj">${escapeHtml(l.subject)}${meta ? `<small>${meta}</small>` : ''}</span>
-              <span class="lec-actions">
-                <button class="btn btn-sm" type="button" data-edit="${l.id}">تعديل</button>
-                <button class="btn btn-sm btn-danger" type="button" data-delete="${l.id}">حذف</button>
-              </span>
-            </li>`;
-          }).join('')}
-        </ul>
-      </div>`).join('');
-}
-
-function renderDatalists() {
-  const all = data.batches.flatMap((b) => b.lectures);
-  const options = (field) => [...new Set(all.map((l) => l[field]).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'ar'))
-    .map((v) => `<option value="${escapeHtml(v)}"></option>`).join('');
-  $('subjects').innerHTML = options('subject');
-  $('rooms').innerHTML = options('room');
-  $('doctors').innerHTML = options('doctor');
+        ${g.items.map((l) => {
+          const meta = [l.room, l.doctor].filter(Boolean).map(escapeHtml).join(' · ');
+          return `
+          <div class="lec-item" style="--c:${colors[l.subject]}">
+            <span class="lec-bar" aria-hidden="true"></span>
+            <div class="lec-info">
+              <strong>${escapeHtml(l.subject)}</strong>
+              <span>${timeText(l.from)} – ${timeText(l.to)}${meta ? ` · ${meta}` : ''}</span>
+            </div>
+            <div class="lec-actions">
+              <button class="btn btn-sm" type="button" data-edit="${l.id}">تعديل</button>
+              <button class="btn btn-sm btn-danger" type="button" data-delete="${l.id}">حذف</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </section>`).join('');
 }
 
 function renderPublishBar() {
   $('publish-bar').classList.toggle('is-dirty', dirty);
   if (busy) $('publish-state').textContent = 'جاري النشر…';
-  else if (dirty) $('publish-state').textContent = 'لديك تعديلات غير منشورة. الطلاب يرون الجدول السابق حتى تنشرها.';
-  else $('publish-state').textContent = data.updatedAt ? `كل التعديلات منشورة · ${formatUpdated(data.updatedAt)}` : 'كل التعديلات منشورة.';
+  else if (dirty) $('publish-state').textContent = 'في تعديلات ما انتشرت. الطلاب لسا بشوفوا الجدول القديم.';
+  else $('publish-state').textContent = data.updatedAt ? `كل شي منشور · ${formatUpdated(data.updatedAt)}` : 'كل شي منشور.';
   $('publish').disabled = !dirty || busy;
   $('discard').disabled = !dirty || busy;
 }
 
 function renderTokenState() {
   $('token-state').textContent = linked
-    ? 'النشر مربوط بـ GitHub: أي شخص يعرف كلمة سر اللوحة يستطيع النشر من أي جهاز.'
-    : 'النشر غير مربوط بـ GitHub بعد. أول نشر سيطلب ربطه مرة واحدة.';
+    ? 'النشر مربوط بـ GitHub: أي حدا معه كلمة سر اللوحة بينشر من أي جهاز.'
+    : 'النشر مش مربوط بـ GitHub لسا. أول نشر رح يطلب الربط مرة وحدة.';
   $('token-change').textContent = linked ? 'تغيير توكن GitHub' : 'ربط GitHub';
 }
 
-/* ---------- النموذج ---------- */
-function resetForm({ keepDay = true } = {}) {
-  editingId = null;
-  if (!keepDay) $('f-day').value = DAYS[0].key;
-  ['f-from', 'f-to', 'f-subject', 'f-room', 'f-doctor'].forEach((id) => { $(id).value = ''; });
-  $('submit-btn').textContent = 'إضافة المحاضرة';
-  $('cancel-edit').hidden = true;
-  $('form-error').textContent = '';
+/* ---------- نموذج المحاضرة (أزرار بدل خانات الوقت) ---------- */
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 ص لـ 8 م
+const MINUTES = [0, 15, 30, 45];
+const DURATIONS = [60, 90, 120, 150, 180];
+const form = { day: 'sat', hour: null, minute: 0, duration: 60 };
+let lastDay = 'sat';
+let lastDuration = 60;
+
+function hourLabel(h) {
+  return `${h % 12 || 12} ${h < 12 ? 'ص' : 'م'}`;
 }
 
-function startEdit(id) {
-  const lecture = getBatch().lectures.find((l) => l.id === id);
-  if (!lecture) return;
-  editingId = id;
-  $('f-day').value = lecture.day;
-  $('f-from').value = lecture.from;
-  $('f-to').value = lecture.to;
-  $('f-subject').value = lecture.subject;
-  $('f-room').value = lecture.room;
-  $('f-doctor').value = lecture.doctor;
-  $('submit-btn').textContent = 'حفظ التعديل';
-  $('cancel-edit').hidden = false;
-  $('form-error').textContent = '';
-  renderAll();
-  $('lecture-form').scrollIntoView({ block: 'nearest' });
-  $('f-subject').focus();
+function chip(group, value, label, active) {
+  return `<button type="button" class="chip${active ? ' is-on' : ''}" role="radio" aria-checked="${active}" data-group="${group}" data-value="${value}">${label}</button>`;
 }
 
-$('lecture-form').addEventListener('submit', (e) => {
+function renderChips() {
+  $('day-chips').innerHTML = DAYS.map((d) => chip('day', d.key, d.name, form.day === d.key)).join('');
+
+  const hours = form.hour !== null && !HOURS.includes(form.hour) ? [...HOURS, form.hour].sort((a, b) => a - b) : HOURS;
+  $('hour-chips').innerHTML = hours.map((h) => chip('hour', h, hourLabel(h), form.hour === h)).join('');
+
+  const minutes = MINUTES.includes(form.minute) ? MINUTES : [...MINUTES, form.minute].sort((a, b) => a - b);
+  $('minute-chips').innerHTML = minutes.map((m) => chip('minute', m, `<span class="ltr">:${String(m).padStart(2, '0')}</span>`, form.minute === m)).join('');
+
+  $('duration-chips').innerHTML = DURATIONS.map((d) => chip('duration', d, durationText(d), form.duration === d)).join('');
+  $('duration-text').textContent = durationText(form.duration);
+
+  const start = form.hour === null ? null : form.hour * 60 + form.minute;
+  $('summary').innerHTML = start === null
+    ? 'اختار الساعة اللي بتبلش فيها المحاضرة'
+    : `<b>${dayName(form.day)}</b> · من ${timeText(start)} لـ ${timeText(start + form.duration)}`;
+}
+
+function renderSubjectChips() {
+  const typed = $('f-subject').value.trim();
+  const names = [...new Set(data.lectures.map((l) => l.subject))].sort((a, b) => a.localeCompare(b, 'ar'));
+  $('subject-chips').hidden = !names.length;
+  $('subject-chips').innerHTML = names.map((n) => `<button type="button" class="chip chip-soft${n === typed ? ' is-on' : ''}" data-subject="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('');
+}
+
+function openLectureForm(lecture = null) {
+  editingId = lecture ? lecture.id : null;
+  $('lec-title').textContent = lecture ? 'تعديل محاضرة' : 'إضافة محاضرة';
+  $('save-again-btn').hidden = Boolean(lecture);
+  $('form-error').textContent = '';
+  if (lecture) {
+    const start = toMinutes(lecture.from);
+    Object.assign(form, { day: lecture.day, hour: Math.floor(start / 60), minute: start % 60, duration: toMinutes(lecture.to) - start });
+    $('f-subject').value = lecture.subject;
+    $('f-room').value = lecture.room;
+    $('f-doctor').value = lecture.doctor;
+  } else {
+    Object.assign(form, { day: lastDay, hour: null, minute: 0, duration: lastDuration });
+    $('f-subject').value = '';
+    $('f-room').value = '';
+    $('f-doctor').value = '';
+  }
+  $('extra').open = Boolean(lecture && (lecture.room || lecture.doctor));
+  renderChips();
+  renderSubjectChips();
+  if (!$('lec-dialog').open) $('lec-dialog').showModal();
+  $('lec-form').scrollTop = 0;
+}
+
+$('lec-form').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-group]');
+  if (c) {
+    const v = c.dataset.value;
+    if (c.dataset.group === 'day') form.day = v;
+    else form[c.dataset.group] = Number(v);
+    $('form-error').textContent = '';
+    renderChips();
+    return;
+  }
+  const s = e.target.closest('[data-subject]');
+  if (s) {
+    $('f-subject').value = s.dataset.subject;
+    renderSubjectChips();
+    return;
+  }
+  const step = e.target.closest('[data-step]');
+  if (step) {
+    form.duration = Math.min(360, Math.max(15, form.duration + Number(step.dataset.step)));
+    renderChips();
+    return;
+  }
+  if (e.target.closest('[data-close]')) $('lec-dialog').close();
+});
+
+$('f-subject').addEventListener('input', () => {
+  const typed = $('f-subject').value.trim();
+  $('subject-chips').querySelectorAll('[data-subject]').forEach((b) => b.classList.toggle('is-on', b.dataset.subject === typed));
+});
+
+$('lec-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const batch = getBatch();
-  if (!batch) return;
+  const again = e.submitter && e.submitter.value === 'again';
+  const fail = (msg) => { $('form-error').textContent = msg; };
+  const subject = $('f-subject').value.trim();
+  if (!subject) return fail('اكتب اسم المادة.');
+  if (form.hour === null) return fail('اختار الساعة اللي بتبلش فيها المحاضرة.');
+  const start = form.hour * 60 + form.minute;
+  const end = start + form.duration;
+  if (end > 24 * 60) return fail('المحاضرة بتعدّي نص الليل. قصّر المدة.');
+
   const v = {
-    day: $('f-day').value,
-    from: $('f-from').value,
-    to: $('f-to').value,
-    subject: $('f-subject').value.trim(),
+    day: form.day,
+    from: fromMinutes(start),
+    to: fromMinutes(end),
+    subject,
     room: $('f-room').value.trim(),
     doctor: $('f-doctor').value.trim(),
   };
-  const fail = (msg) => { $('form-error').textContent = msg; };
-  if (!v.from || !v.to) return fail('اكتب وقت البداية ووقت النهاية.');
-  if (toMinutes(v.to) <= toMinutes(v.from)) return fail('وقت النهاية يجب أن يكون بعد وقت البداية.');
-  if (!v.subject) return fail('اكتب اسم المادة.');
-
-  const clash = batch.lectures.find((l) => l.id !== editingId && l.day === v.day
-    && toMinutes(l.from) < toMinutes(v.to) && toMinutes(v.from) < toMinutes(l.to));
-  if (clash && !confirm(`هذا الموعد يتعارض مع «${clash.subject}» (${timeText(clash.from)} – ${timeText(clash.to)}) يوم ${dayName(clash.day)}. حفظ رغم التعارض؟`)) return;
+  const clash = data.lectures.find((l) => l.id !== editingId && l.day === v.day
+    && toMinutes(l.from) < end && start < toMinutes(l.to));
+  if (clash && !confirm(`هاد الموعد متعارض مع «${clash.subject}» (${timeText(clash.from)} – ${timeText(clash.to)}) يوم ${dayName(clash.day)}. بدك تحفظها برضو؟`)) return;
 
   if (editingId) {
-    Object.assign(batch.lectures.find((l) => l.id === editingId), v);
-    resetForm();
-    toast('تم حفظ التعديل.');
+    Object.assign(data.lectures.find((l) => l.id === editingId), v);
+    toast('انحفظ التعديل.');
   } else {
-    batch.lectures.push({ id: makeId(), ...v });
-    // تجهيز المحاضرة اللي بعدها: نفس اليوم، تبدأ وقت ما خلصت هاي وبنفس المدة
-    const duration = toMinutes(v.to) - toMinutes(v.from);
-    resetForm();
-    $('f-from').value = v.to;
-    if (toMinutes(v.to) + duration < 24 * 60) $('f-to').value = fromMinutes(toMinutes(v.to) + duration);
-    toast(`أُضيفت «${v.subject}».`);
+    data.lectures.push({ id: makeId(), ...v });
+    toast(`انضافت «${subject}».`);
   }
-  batch.lectures.sort(sortLectures);
+  data.lectures.sort(sortLectures);
+  lastDay = form.day;
+  lastDuration = form.duration;
   commit();
-  $('f-subject').focus();
+
+  if (again) {
+    // المحاضرة الجاية: نفس اليوم، بتبلش لما تخلص هاي وبنفس المدة
+    openLectureForm();
+    if (end + form.duration <= 24 * 60) {
+      form.hour = Math.floor(end / 60);
+      form.minute = end % 60;
+    }
+    renderChips();
+  } else {
+    $('lec-dialog').close();
+  }
 });
 
-$('cancel-edit').addEventListener('click', () => {
-  resetForm();
-  renderAll();
-});
+$('add-btn').addEventListener('click', () => openLectureForm());
 
 $('lecture-list').addEventListener('click', (e) => {
   const edit = e.target.closest('[data-edit]');
-  if (edit) return startEdit(edit.dataset.edit);
+  if (edit) return openLectureForm(data.lectures.find((l) => l.id === edit.dataset.edit));
   const del = e.target.closest('[data-delete]');
   if (!del) return;
-  const batch = getBatch();
-  const lecture = batch.lectures.find((l) => l.id === del.dataset.delete);
-  if (!lecture || !confirm(`حذف «${lecture.subject}» يوم ${dayName(lecture.day)} ${timeText(lecture.from)}؟`)) return;
-  batch.lectures = batch.lectures.filter((l) => l.id !== lecture.id);
-  if (editingId === lecture.id) resetForm();
+  const lecture = data.lectures.find((l) => l.id === del.dataset.delete);
+  if (!lecture || !confirm(`تحذف «${lecture.subject}» يوم ${dayName(lecture.day)} ${timeText(lecture.from)}؟`)) return;
+  data.lectures = data.lectures.filter((l) => l.id !== lecture.id);
   commit();
-  toast('تم الحذف.');
+  toast('انحذفت.');
 });
 
-/* ---------- الدفعات ---------- */
-$('tabs').addEventListener('click', (e) => {
-  const tab = e.target.closest('[data-batch]');
-  if (!tab) return;
-  currentBatch = tab.dataset.batch;
-  resetForm();
-  renderAll();
-});
-
-$('batch-form').addEventListener('submit', (e) => {
+/* ---------- عنوان الجدول ---------- */
+$('title-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const name = $('batch-name').value.trim();
-  if (!name) return $('batch-name').focus();
-  if (data.batches.some((b) => b.name === name)) return toast(`دفعة ${name} موجودة.`, true);
-  data.batches.push({ name, lectures: [] });
-  data.batches.sort((a, b) => a.name.localeCompare(b.name, 'ar', { numeric: true }));
-  currentBatch = name;
-  $('batch-name').value = '';
-  resetForm();
+  data.title = $('t-title').value.trim() || DEFAULT_TITLE;
+  data.subtitle = $('t-subtitle').value.trim();
+  $('t-title').value = data.title;
   commit();
-  toast(`أُضيفت دفعة ${name}.`);
+  toast('انحفظ العنوان. انشر التعديلات ليظهر للطلاب.');
 });
 
-$('delete-batch').addEventListener('click', () => {
-  const batch = getBatch();
-  if (!batch) return;
-  const count = batch.lectures.length ? ` وكل محاضراتها (${lectureCountText(batch.lectures.length)})` : '';
-  if (!confirm(`حذف دفعة ${batch.name}${count}؟ لن يتغير شيء للطلاب حتى تضغط «نشر التعديلات».`)) return;
-  data.batches = data.batches.filter((b) => b !== batch);
-  currentBatch = null;
-  resetForm();
-  commit();
-  toast(`حُذفت دفعة ${batch.name}.`);
-});
+function fillTitleForm() {
+  $('t-title').value = data.title;
+  $('t-subtitle').value = data.subtitle;
+}
 
 /* ---------- النشر ---------- */
 function setBusy(on) {
@@ -403,21 +427,21 @@ async function publish() {
       throw err;
     }
     if (!t) return openTokenDialog();
-    const payload = { updatedAt: new Date().toISOString(), batches: data.batches };
+    const payload = { updatedAt: new Date().toISOString(), title: data.title, subtitle: data.subtitle, lectures: data.lectures };
     await putFile(t, JSON.stringify(payload, null, 2) + '\n');
     data.updatedAt = payload.updatedAt;
     dirty = false;
     clearDraft();
-    toast('تم النشر. يظهر للطلاب خلال دقيقة تقريباً.');
+    toast('انتشر الجدول. بيظهر للطلاب خلال دقيقة تقريباً.');
   } catch (err) {
     if (err.status === 401) {
       token = null;
-      openTokenDialog('توكن GitHub المحفوظ انتهت صلاحيته أو أُلغي. أنشئ توكن جديداً واربطه.');
+      openTokenDialog('توكن GitHub المحفوظ خلصت صلاحيته أو انلغى. اعمل توكن جديد واربطه.');
     } else if (err.status === 403 || err.status === 404) {
       token = null;
-      openTokenDialog(`توكن GitHub المحفوظ لا يملك صلاحية الكتابة على مستودع ${CONFIG.repo}. أنشئ توكن جديداً حسب الخطوات.`);
+      openTokenDialog(`توكن GitHub المحفوظ ما عنده صلاحية كتابة على مستودع ${CONFIG.repo}. اعمل توكن جديد حسب الخطوات.`);
     } else {
-      toast('تعذّر النشر. تأكد من الاتصال بالإنترنت ثم حاول مرة ثانية؛ تعديلاتك محفوظة على هذا الجهاز.', true);
+      toast('ما زبط النشر. تأكد من الإنترنت وجرّب كمان مرة؛ تعديلاتك محفوظة على هالجهاز.', true);
     }
   } finally {
     setBusy(false);
@@ -428,28 +452,29 @@ async function publish() {
 $('publish').addEventListener('click', publish);
 
 $('discard').addEventListener('click', async () => {
-  if (!confirm('تجاهل كل التعديلات غير المنشورة والرجوع للجدول المنشور؟')) return;
+  if (!confirm('تتراجع عن كل التعديلات اللي ما انتشرت؟')) return;
   clearDraft();
-  resetForm();
   await showEditor();
   toast('رجعت اللوحة للجدول المنشور.');
 });
 
-/* ---------- ربط GitHub (مرة واحدة لكل الموقع) ---------- */
+/* ---------- ربط GitHub (مرة وحدة لكل الموقع) ---------- */
 function openTokenDialog(message = '') {
   $('token-error').textContent = message;
   $('token-input').value = '';
   $('token-save').textContent = dirty ? 'ربط ونشر' : 'ربط';
   if (!$('token-dialog').open) $('token-dialog').showModal();
-  $('token-input').focus();
 }
 
 $('token-form').addEventListener('submit', async (e) => {
-  if (e.submitter && e.submitter.value === 'cancel') return;
   e.preventDefault();
+  if (e.submitter && e.submitter.value === 'cancel') {
+    $('token-dialog').close();
+    return;
+  }
   const value = $('token-input').value.trim();
   if (!/^(github_pat_|ghp_)\w{20,}$/.test(value)) {
-    $('token-error').textContent = 'هذا لا يشبه توكن GitHub. التوكن يبدأ بـ github_pat_';
+    $('token-error').textContent = 'هاد مش شكل توكن GitHub. التوكن بيبلش بـ github_pat_';
     return;
   }
   const save = $('token-save');
@@ -457,7 +482,7 @@ $('token-form').addEventListener('submit', async (e) => {
   save.textContent = 'جاري الربط…';
   $('token-error').textContent = '';
   try {
-    // التوكن ينحفظ بالمستودع مشفّراً بكلمة سر اللوحة؛ الحفظ نفسه يتأكد إن عنده صلاحية الكتابة
+    // التوكن بينحفظ بالمستودع مشفّر بكلمة سر اللوحة؛ الحفظ نفسه بيتأكد إن عنده صلاحية كتابة
     const blob = await encryptToken(value, loginPassword);
     await putFile(value, JSON.stringify(blob, null, 2) + '\n', CONFIG.accessPath, 'ربط لوحة الإدارة بـ GitHub');
     token = value;
@@ -465,13 +490,13 @@ $('token-form').addEventListener('submit', async (e) => {
     $('token-dialog').close();
     renderTokenState();
     if (dirty) publish();
-    else toast('تم الربط. أي شخص يعرف كلمة سر اللوحة يستطيع النشر الآن من أي جهاز.');
+    else toast('تم الربط. أي حدا معه كلمة سر اللوحة بينشر هلأ من أي جهاز.');
   } catch (err) {
     $('token-error').textContent = err.status === 401
-      ? 'GitHub رفض هذا التوكن. تأكد أنك نسخته كاملاً.'
+      ? 'GitHub رفض هالتوكن. تأكد إنك نسخته كامل.'
       : err.status === 403 || err.status === 404
-        ? `التوكن لا يملك صلاحية الكتابة على مستودع ${CONFIG.repo}. راجع الخطوتين 2 و3.`
-        : 'تعذّر الاتصال بـ GitHub. تأكد من الإنترنت ثم حاول مرة ثانية.';
+        ? `التوكن ما عنده صلاحية كتابة على مستودع ${CONFIG.repo}. راجع الخطوة 2 و3.`
+        : 'ما قدرنا نوصل لـ GitHub. تأكد من الإنترنت وجرّب كمان مرة.';
   } finally {
     save.disabled = false;
     save.textContent = dirty ? 'ربط ونشر' : 'ربط';
@@ -480,9 +505,15 @@ $('token-form').addEventListener('submit', async (e) => {
 
 $('token-change').addEventListener('click', () => openTokenDialog());
 
+/* إغلاق النوافذ بالضغط برا */
+document.querySelectorAll('dialog.sheet').forEach((d) => {
+  d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
+});
+
 /* ---------- نسخة احتياطية ---------- */
 $('export').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({ updatedAt: data.updatedAt, batches: data.batches }, null, 2)], { type: 'application/json' });
+  const payload = { updatedAt: data.updatedAt, title: data.title, subtitle: data.subtitle, lectures: data.lectures };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `jadwal-${new Date().toISOString().slice(0, 10)}.json`;
@@ -494,24 +525,22 @@ $('import-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
-  let imported;
+  let imported = null;
   try {
     imported = normalizeData(JSON.parse(await file.text()));
-  } catch {
-    imported = null;
-  }
-  if (!imported || !imported.batches.length) return toast('الملف لا يحتوي على جدول صالح.', true);
-  if (!confirm('استبدال الجدول الحالي في اللوحة بمحتوى الملف؟ لن يتغير شيء للطلاب حتى تنشر.')) return;
+  } catch {}
+  if (!imported || !imported.lectures.length) return toast('الملف ما فيه جدول صالح.', true);
+  if (!confirm('تستبدل الجدول اللي باللوحة بمحتوى الملف؟ ما رح يتغير شي عند الطلاب لحتى تنشر.')) return;
   data = imported;
-  currentBatch = null;
-  resetForm();
+  fillTitleForm();
   commit();
-  toast('تم استرجاع النسخة. راجعها ثم انشرها.');
+  toast('رجعت النسخة. راجعها وبعدين انشرها.');
 });
 
 /* ---------- الدخول ---------- */
 function showLogin() {
   $('editor').hidden = true;
+  $('hero-links').hidden = true;
   $('login').hidden = false;
   $('pass').focus();
 }
@@ -519,6 +548,7 @@ function showLogin() {
 async function showEditor() {
   $('login').hidden = true;
   $('editor').hidden = false;
+  $('hero-links').hidden = false;
   $('workspace').hidden = true;
   $('load-error').hidden = true;
   $('loading').hidden = false;
@@ -531,13 +561,14 @@ async function showEditor() {
   }
   $('loading').hidden = true;
   $('workspace').hidden = false;
+  fillTitleForm();
   renderAll();
 }
 
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!window.crypto || !crypto.subtle) {
-    $('login-error').textContent = 'افتح لوحة الإدارة من رابط الموقع (https) حتى يعمل تسجيل الدخول.';
+    $('login-error').textContent = 'افتح لوحة الإدارة من رابط الموقع (https) حتى يزبط الدخول.';
     return;
   }
   const btn = $('login-btn');
@@ -546,7 +577,7 @@ $('login-form').addEventListener('submit', async (e) => {
   try {
     const password = $('pass').value;
     if (!(await checkPassword(password))) {
-      $('login-error').textContent = 'كلمة السر غير صحيحة.';
+      $('login-error').textContent = 'كلمة السر غلط.';
       $('pass').select();
       return;
     }
@@ -575,7 +606,6 @@ $('logout').addEventListener('click', () => {
 
 $('retry-load').addEventListener('click', showEditor);
 
-$('f-day').innerHTML = DAYS.map((d) => `<option value="${d.key}">${d.name}</option>`).join('');
 $('token-link').href = TOKEN_URL;
 $('token-repo').textContent = CONFIG.repo;
 

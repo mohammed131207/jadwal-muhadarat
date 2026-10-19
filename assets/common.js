@@ -8,18 +8,28 @@ const CONFIG = {
   accessPath: 'data/access.json',
 };
 
+const DEFAULT_TITLE = 'جدول المحاضرات';
+
 /* الأسبوع الدراسي يبدأ من السبت. js = رقم اليوم في Date.getDay() */
 const DAYS = [
-  { key: 'sat', name: 'السبت', js: 6 },
-  { key: 'sun', name: 'الأحد', js: 0 },
-  { key: 'mon', name: 'الاثنين', js: 1 },
-  { key: 'tue', name: 'الثلاثاء', js: 2 },
-  { key: 'wed', name: 'الأربعاء', js: 3 },
-  { key: 'thu', name: 'الخميس', js: 4 },
-  { key: 'fri', name: 'الجمعة', js: 5 },
+  { key: 'sat', name: 'السبت', short: 'سبت', js: 6 },
+  { key: 'sun', name: 'الأحد', short: 'أحد', js: 0 },
+  { key: 'mon', name: 'الاثنين', short: 'اثنين', js: 1 },
+  { key: 'tue', name: 'الثلاثاء', short: 'ثلاثاء', js: 2 },
+  { key: 'wed', name: 'الأربعاء', short: 'أربعاء', js: 3 },
+  { key: 'thu', name: 'الخميس', short: 'خميس', js: 4 },
+  { key: 'fri', name: 'الجمعة', short: 'جمعة', js: 5 },
 ];
 const DAY_ORDER = Object.fromEntries(DAYS.map((d, i) => [d.key, i]));
-const DRAFT_KEY = 'jadwal.draft';
+const DRAFT_KEY = 'jadwal.draft.v2';
+
+/* ألوان المواد: كل مادة تاخد لون ثابت حسب ترتيبها الأبجدي */
+const SUBJECT_COLORS = ['#3B6FF0', '#8B5CF6', '#E5487F', '#F0802B', '#12A08A', '#3E9F4F', '#D99A06', '#1A9BC7', '#C2410C', '#6366F1'];
+
+function subjectColors(lectures) {
+  const names = [...new Set(lectures.map((l) => l.subject))].sort((a, b) => a.localeCompare(b, 'ar'));
+  return Object.fromEntries(names.map((n, i) => [n, SUBJECT_COLORS[i % SUBJECT_COLORS.length]]));
+}
 
 function dayName(key) {
   const d = DAYS.find((x) => x.key === key);
@@ -41,24 +51,11 @@ function fromMinutes(total) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function timeParts(t) {
-  const total = toMinutes(t);
-  const h24 = Math.floor(total / 60);
-  const m = total % 60;
-  return {
-    num: `${h24 % 12 || 12}:${String(m).padStart(2, '0')}`,
-    ap: h24 < 12 ? 'ص' : 'م',
-  };
-}
-
-function timeHtml(t) {
-  const p = timeParts(t);
-  return `<span class="t-num">${p.num}</span> <span class="t-ap">${p.ap}</span>`;
-}
-
 function timeText(t) {
-  const p = timeParts(t);
-  return `${p.num} ${p.ap}`;
+  const total = typeof t === 'number' ? t : toMinutes(t);
+  const h24 = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${h24 % 12 || 12}:${String(m).padStart(2, '0')} ${h24 < 12 ? 'ص' : 'م'}`;
 }
 
 function countWord(n, one, two, few, many) {
@@ -71,15 +68,11 @@ function countWord(n, one, two, few, many) {
 function durationText(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
+  if (m === 30 && h > 0) return `${h === 1 ? 'ساعة' : h === 2 ? 'ساعتين' : `${h} ساعات`} ونص`;
   const hs = h ? countWord(h, 'ساعة', 'ساعتين', 'ساعات', 'ساعة') : '';
   const ms = m ? countWord(m, 'دقيقة', 'دقيقتين', 'دقائق', 'دقيقة') : '';
   if (hs && ms) return `${hs} و${ms}`;
   return hs || ms || 'أقل من دقيقة';
-}
-
-function lectureCountText(n) {
-  if (n === 0) return 'لا محاضرات بعد';
-  return countWord(n, 'محاضرة واحدة', 'محاضرتان', 'محاضرات', 'محاضرة');
 }
 
 function sortLectures(a, b) {
@@ -92,28 +85,37 @@ function makeId() {
 
 const TIME_RE = /^\d{2}:\d{2}$/;
 
-/* يرجّع نسخة نظيفة من البيانات مهما كان شكل الملف */
+/* يرجّع نسخة نظيفة من البيانات. بيقبل كمان الشكل القديم اللي كان فيه دفعات */
 function normalizeData(raw) {
-  const out = { updatedAt: null, batches: [] };
+  const out = { updatedAt: null, title: DEFAULT_TITLE, subtitle: '', lectures: [] };
   if (!raw || typeof raw !== 'object') return out;
   out.updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : null;
-  for (const b of Array.isArray(raw.batches) ? raw.batches : []) {
-    const name = String((b && b.name) || '').trim();
-    if (!name || out.batches.some((x) => x.name === name)) continue;
-    const lectures = (Array.isArray(b.lectures) ? b.lectures : [])
-      .filter((l) => l && DAY_ORDER[l.day] !== undefined && TIME_RE.test(l.from) && TIME_RE.test(l.to) && String(l.subject || '').trim())
-      .map((l) => ({
-        id: String(l.id || makeId()),
-        day: l.day,
-        from: l.from,
-        to: l.to,
-        subject: String(l.subject).trim(),
-        room: String(l.room || '').trim(),
-        doctor: String(l.doctor || '').trim(),
-      }))
-      .sort(sortLectures);
-    out.batches.push({ name, lectures });
+
+  let source = raw.lectures;
+  if (!Array.isArray(source) && Array.isArray(raw.batches)) {
+    const batches = raw.batches.filter((b) => b && Array.isArray(b.lectures));
+    const batch = batches.find((b) => String(b.name) === '2025')
+      || batches.find((b) => b.lectures.length)
+      || batches[0];
+    source = batch ? batch.lectures : [];
+    if (batch && raw.subtitle === undefined) out.subtitle = `دفعة ${batch.name}`;
   }
+
+  if (typeof raw.title === 'string' && raw.title.trim()) out.title = raw.title.trim();
+  if (typeof raw.subtitle === 'string') out.subtitle = raw.subtitle.trim();
+
+  out.lectures = (Array.isArray(source) ? source : [])
+    .filter((l) => l && DAY_ORDER[l.day] !== undefined && TIME_RE.test(l.from) && TIME_RE.test(l.to) && String(l.subject || '').trim())
+    .map((l) => ({
+      id: String(l.id || makeId()),
+      day: l.day,
+      from: l.from,
+      to: l.to,
+      subject: String(l.subject).trim(),
+      room: String(l.room || '').trim(),
+      doctor: String(l.doctor || '').trim(),
+    }))
+    .sort(sortLectures);
   return out;
 }
 

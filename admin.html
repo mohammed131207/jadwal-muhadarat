@@ -2,129 +2,84 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex">
   <title>لوحة الإدارة · جدول المحاضرات</title>
-  <meta name="theme-color" content="#123B2E">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23123B2E'/%3E%3Crect x='12' y='26' width='40' height='14' rx='3' fill='%23F7DE4B'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#4338CA">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234338CA'/%3E%3Crect x='14' y='16' width='15' height='14' rx='4' fill='%23fff'/%3E%3Crect x='35' y='16' width='15' height='22' rx='4' fill='%23C7D2FE'/%3E%3Crect x='14' y='35' width='15' height='13' rx='4' fill='%23C7D2FE'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Readex+Pro:wght@300..600&family=Reem+Kufi:wght@500..700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=2">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css?v=3">
 </head>
-<body>
-  <div class="sheet">
-    <header class="masthead">
-      <p class="eyebrow">جدول المحاضرات</p>
-      <h1>لوحة الإدارة</h1>
-    </header>
+<body class="admin">
+  <header class="hero hero-sm">
+    <div class="wrap hero-row">
+      <div>
+        <p class="hero-sub">جدول المحاضرات</p>
+        <h1>لوحة الإدارة</h1>
+      </div>
+      <nav class="hero-links" id="hero-links" hidden>
+        <a href="./" target="_blank" rel="noopener">الجدول المنشور</a>
+        <a href="./?preview=1" target="_blank" rel="noopener">معاينة</a>
+        <button class="link-btn" type="button" id="logout">خروج</button>
+      </nav>
+    </div>
+  </header>
 
-    <main>
-      <!-- تسجيل الدخول -->
-      <section id="login" hidden>
-        <form id="login-form" class="card login-card">
-          <div class="field">
-            <label for="pass">كلمة السر</label>
-            <input id="pass" type="password" autocomplete="current-password" required>
-          </div>
-          <p class="error" id="login-error" role="alert"></p>
-          <button class="btn btn-primary" type="submit" id="login-btn">دخول</button>
-        </form>
-        <p><a class="admin-link" href="./">الرجوع للجدول</a></p>
-      </section>
+  <main class="wrap">
+    <!-- تسجيل الدخول -->
+    <section id="login" hidden>
+      <form id="login-form" class="card login-card">
+        <h2>تسجيل الدخول</h2>
+        <label for="pass">كلمة السر</label>
+        <input id="pass" type="password" autocomplete="current-password" required>
+        <p class="error" id="login-error" role="alert"></p>
+        <button class="btn btn-primary btn-block" type="submit" id="login-btn">دخول</button>
+        <a class="admin-link" href="./">الرجوع للجدول</a>
+      </form>
+    </section>
 
-      <!-- المحرر -->
-      <section id="editor" hidden>
-        <div class="notice" id="load-error" role="alert" hidden>
-          <p>تعذّر تحميل الجدول المنشور. تأكد من الاتصال بالإنترنت ثم أعد المحاولة.</p>
-          <button class="btn" type="button" id="retry-load">إعادة المحاولة</button>
-        </div>
-        <p class="loading" id="loading">جاري تحميل الجدول…</p>
+    <!-- المحرر -->
+    <section id="editor" hidden>
+      <p class="state" id="loading">جاري تحميل الجدول…</p>
+      <div class="card state" id="load-error" role="alert" hidden>
+        <p>ما قدرنا نحمّل الجدول المنشور. تأكد من الإنترنت وجرّب كمان مرة.</p>
+        <button class="btn btn-primary" type="button" id="retry-load">إعادة المحاولة</button>
+      </div>
 
-        <div id="workspace" hidden>
-        <div class="admin-links">
-          <a href="./" target="_blank" rel="noopener">عرض الجدول المنشور</a>
-          <a href="./?preview=1" target="_blank" rel="noopener">معاينة التعديلات</a>
-          <span class="spacer"></span>
-          <button class="link-btn" type="button" id="logout">تسجيل الخروج</button>
-        </div>
-
-        <div class="batch-bar">
-          <div class="tabs" id="tabs" role="group" aria-label="الدفعات"></div>
-          <form class="inline-form" id="batch-form">
-            <label class="sr-only" for="batch-name">اسم الدفعة الجديدة</label>
-            <input id="batch-name" placeholder="مثلاً 2027" autocomplete="off">
-            <button class="btn" type="submit">إضافة دفعة</button>
-          </form>
+      <div id="workspace" hidden>
+        <div class="toolbar">
+          <h2 id="count-title">المحاضرات</h2>
+          <button class="btn btn-primary" type="button" id="add-btn">+ إضافة محاضرة</button>
         </div>
 
-        <p class="empty" id="no-batches" hidden>لا توجد دفعات. أضف دفعة من الحقل بالأعلى للبدء.</p>
-
-        <div class="editor-grid" id="editor-grid">
-          <form class="card" id="lecture-form" novalidate>
-            <h2 id="form-title">إضافة محاضرة</h2>
-            <div class="field">
-              <label for="f-day">اليوم</label>
-              <select id="f-day" required></select>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="f-from">من</label>
-                <input id="f-from" type="time" required>
-              </div>
-              <div class="field">
-                <label for="f-to">إلى</label>
-                <input id="f-to" type="time" required>
-              </div>
-            </div>
-            <div class="field">
-              <label for="f-subject">المادة</label>
-              <input id="f-subject" list="subjects" autocomplete="off" required>
-              <datalist id="subjects"></datalist>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="f-room">القاعة <span class="optional">(اختياري)</span></label>
-                <input id="f-room" list="rooms" autocomplete="off">
-                <datalist id="rooms"></datalist>
-              </div>
-              <div class="field">
-                <label for="f-doctor">المحاضر <span class="optional">(اختياري)</span></label>
-                <input id="f-doctor" list="doctors" autocomplete="off">
-                <datalist id="doctors"></datalist>
-              </div>
-            </div>
-            <p class="error" id="form-error" role="alert"></p>
-            <div class="actions">
-              <button class="btn btn-primary" type="submit" id="submit-btn">إضافة المحاضرة</button>
-              <button class="btn" type="button" id="cancel-edit" hidden>إلغاء التعديل</button>
-            </div>
-          </form>
-
-          <section class="card">
-            <div class="list-head">
-              <h2 id="list-title">المحاضرات</h2>
-              <button class="btn btn-danger btn-sm" type="button" id="delete-batch">حذف الدفعة</button>
-            </div>
-            <div id="lecture-list"></div>
-          </section>
-        </div>
+        <div id="lecture-list"></div>
 
         <details class="card tools">
-          <summary>نسخة احتياطية وإعدادات النشر</summary>
+          <summary>إعدادات الجدول</summary>
           <div class="tools-body">
-            <div>
-              <p>نزّل نسخة من الجدول على جهازك، أو استرجع نسخة سابقة.</p>
-              <div class="actions">
-                <button class="btn btn-sm" type="button" id="export">تنزيل نسخة</button>
-                <label class="btn btn-sm" for="import-file" style="margin:0;color:var(--ink)">استرجاع نسخة</label>
-                <input class="sr-only" type="file" id="import-file" accept="application/json,.json">
+            <form id="title-form" class="title-form">
+              <div class="field">
+                <label for="t-title">عنوان الجدول</label>
+                <input id="t-title" autocomplete="off" maxlength="60">
               </div>
-            </div>
+              <div class="field">
+                <label for="t-subtitle">السطر الصغير فوق العنوان</label>
+                <input id="t-subtitle" autocomplete="off" maxlength="60" placeholder="مثلاً: دفعة 2025">
+              </div>
+              <button class="btn" type="submit">حفظ العنوان</button>
+            </form>
             <div>
               <p id="token-state"></p>
+              <button class="btn btn-sm" type="button" id="token-change">ربط GitHub</button>
+            </div>
+            <div>
+              <p>نسخة احتياطية من الجدول على جهازك.</p>
               <div class="actions">
-                <button class="btn btn-sm" type="button" id="token-change">ربط GitHub</button>
+                <button class="btn btn-sm" type="button" id="export">تنزيل نسخة</button>
+                <label class="btn btn-sm" for="import-file">استرجاع نسخة</label>
+                <input class="sr-only" type="file" id="import-file" accept="application/json,.json">
               </div>
             </div>
           </div>
@@ -132,40 +87,104 @@
 
         <div class="publish-bar" id="publish-bar">
           <p id="publish-state"></p>
-          <button class="btn btn-sm" type="button" id="discard">تجاهل التعديلات</button>
-          <button class="btn btn-primary btn-sm" type="button" id="publish">نشر التعديلات</button>
+          <div class="actions">
+            <button class="btn btn-sm btn-ghost-light" type="button" id="discard">تراجع</button>
+            <button class="btn btn-sm btn-accent" type="button" id="publish">نشر التعديلات</button>
+          </div>
         </div>
-        </div>
-      </section>
-    </main>
-  </div>
+      </div>
+    </section>
+  </main>
 
-  <dialog id="token-dialog" aria-labelledby="token-title">
-    <form method="dialog" id="token-form">
-      <h2 id="token-title">ربط النشر بـ GitHub (مرة واحدة)</h2>
-      <p>هذه الخطوة يقوم بها صاحب حساب GitHub للموقع مرة واحدة فقط. بعدها يستطيع أي شخص يعرف كلمة سر اللوحة النشر من أي جهاز بدون توكن.</p>
+  <!-- نموذج المحاضرة -->
+  <dialog class="sheet sheet-form" id="lec-dialog" aria-labelledby="lec-title">
+    <form id="lec-form" class="sheet-body" novalidate autocomplete="off">
+      <div class="sheet-top">
+        <h2 id="lec-title">إضافة محاضرة</h2>
+        <button class="icon-btn" type="button" data-close aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="f-subject">اسم المادة</label>
+        <input id="f-subject" type="text" enterkeyhint="done" autocomplete="off" autocorrect="off" spellcheck="false">
+        <div class="chips chips-scroll" id="subject-chips"></div>
+      </div>
+
+      <div class="field">
+        <span class="label">اليوم</span>
+        <div class="chips" id="day-chips" role="radiogroup" aria-label="اليوم"></div>
+      </div>
+
+      <div class="field">
+        <span class="label">بتبلش الساعة</span>
+        <div class="chips chips-grid" id="hour-chips" role="radiogroup" aria-label="الساعة"></div>
+        <div class="chips minute-chips" id="minute-chips" role="radiogroup" aria-label="الدقائق"></div>
+      </div>
+
+      <div class="field">
+        <span class="label">مدتها</span>
+        <div class="chips" id="duration-chips" role="radiogroup" aria-label="المدة"></div>
+        <div class="stepper">
+          <button class="btn btn-sm" type="button" data-step="-15">− ربع ساعة</button>
+          <span id="duration-text"></span>
+          <button class="btn btn-sm" type="button" data-step="15">+ ربع ساعة</button>
+        </div>
+      </div>
+
+      <p class="summary" id="summary"></p>
+
+      <details class="extra" id="extra">
+        <summary>القاعة والمحاضر (اختياري)</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="f-room">القاعة</label>
+            <input id="f-room" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-doctor">المحاضر</label>
+            <input id="f-doctor" type="text" autocomplete="off">
+          </div>
+        </div>
+      </details>
+
+      <p class="error" id="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button class="btn btn-primary" type="submit" value="close" id="save-btn">حفظ</button>
+        <button class="btn" type="submit" value="again" id="save-again-btn">حفظ وضيف غيرها</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ربط GitHub -->
+  <dialog class="sheet" id="token-dialog" aria-labelledby="token-title">
+    <form id="token-form" class="sheet-body">
+      <div class="sheet-top">
+        <h2 id="token-title">ربط النشر بـ GitHub (مرة وحدة)</h2>
+        <button class="icon-btn" type="submit" value="cancel" formnovalidate aria-label="إغلاق">✕</button>
+      </div>
+      <p>هاي الخطوة بيعملها صاحب حساب GitHub مرة وحدة بس. بعدها أي حدا معه كلمة سر اللوحة بينشر من أي جهاز بدون توكن.</p>
       <ol>
         <li><a id="token-link" target="_blank" rel="noopener">افتح صفحة إنشاء التوكن</a> وسجّل دخول بحساب GitHub صاحب الموقع.</li>
-        <li>تحت <b class="ltr">Repository access</b> اختر <b class="ltr">Only select repositories</b> ثم اختر <b class="ltr" id="token-repo"></b>.</li>
-        <li>تحت <b class="ltr">Permissions</b> اجعل <b class="ltr">Contents</b> على <b class="ltr">Read and write</b>.</li>
-        <li>اضغط <b class="ltr">Generate token</b>، انسخ التوكن والصقه هنا.</li>
+        <li>تحت <b class="ltr">Repository access</b> اختار <b class="ltr">Only select repositories</b> وبعدين <b class="ltr" id="token-repo"></b>.</li>
+        <li>تحت <b class="ltr">Permissions</b> خلّي <b class="ltr">Contents</b> على <b class="ltr">Read and write</b>.</li>
+        <li>اضغط <b class="ltr">Generate token</b>، انسخ التوكن والصقه هون.</li>
       </ol>
       <div class="field">
         <label for="token-input">التوكن</label>
         <input id="token-input" type="password" class="ltr" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
       </div>
       <p class="error" id="token-error" role="alert"></p>
-      <div class="actions">
+      <div class="sheet-actions">
         <button class="btn btn-primary" type="submit" value="save" id="token-save">ربط</button>
-        <button class="btn" type="submit" value="cancel" formnovalidate>إلغاء</button>
       </div>
-      <p class="fine">التوكن يُحفظ في الموقع مشفّراً بكلمة سر اللوحة، وصلاحيته مقتصرة على تعديل ملفات هذا المستودع.</p>
+      <p class="fine">التوكن بينحفظ بالموقع مشفّر بكلمة سر اللوحة، وصلاحيته محصورة بتعديل ملفات هالمستودع.</p>
     </form>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="assets/common.js?v=2"></script>
-  <script src="assets/admin.js?v=2"></script>
+  <script src="assets/common.js?v=3"></script>
+  <script src="assets/admin.js?v=3"></script>
 </body>
 </html>

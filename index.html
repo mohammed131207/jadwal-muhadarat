@@ -2,33 +2,42 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>جدول المحاضرات</title>
-  <meta name="description" content="جدول المحاضرات حسب الدفعة: اليوم والموعد والمادة.">
-  <meta name="theme-color" content="#123B2E">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23123B2E'/%3E%3Crect x='12' y='26' width='40' height='14' rx='3' fill='%23F7DE4B'/%3E%3C/svg%3E">
+  <meta name="description" content="جدول المحاضرات الأسبوعي: اليوم والموعد والمادة.">
+  <meta name="theme-color" content="#4338CA">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234338CA'/%3E%3Crect x='14' y='16' width='15' height='14' rx='4' fill='%23fff'/%3E%3Crect x='35' y='16' width='15' height='22' rx='4' fill='%23C7D2FE'/%3E%3Crect x='14' y='35' width='15' height='13' rx='4' fill='%23C7D2FE'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Readex+Pro:wght@300..600&family=Reem+Kufi:wght@500..700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=2">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css?v=3">
 </head>
-<body>
-  <div class="sheet">
-    <p class="preview-note" id="preview-note" hidden>معاينة: هذه تعديلات لوحة الإدارة التي لم تُنشر بعد.</p>
-    <header class="masthead">
-      <p class="eyebrow">جدول المحاضرات</p>
-      <h1 id="title">أنت من أي دفعة؟</h1>
-    </header>
+<body class="public">
+  <header class="hero">
+    <div class="wrap">
+      <p class="preview-note" id="preview-note" hidden>معاينة للتعديلات اللي لسا ما انتشرت</p>
+      <p class="hero-sub" id="subtitle"></p>
+      <h1 id="title">جدول المحاضرات</h1>
+      <div class="now" id="now" aria-live="polite" hidden></div>
+    </div>
+  </header>
 
-    <main id="app"></main>
+  <main class="wrap">
+    <section class="card board-card" id="app">
+      <p class="state">جاري تحميل الجدول…</p>
+    </section>
+  </main>
 
-    <footer class="foot">
-      <span id="updated"></span>
-      <a class="admin-link" href="admin.html">دخول الادمن</a>
-    </footer>
-  </div>
+  <footer class="wrap foot">
+    <span id="updated"></span>
+    <a class="admin-link" href="admin.html">دخول الادمن</a>
+  </footer>
 
-  <script src="assets/common.js?v=2"></script>
-  <script src="assets/app.js?v=2"></script>
+  <dialog class="sheet" id="details" aria-labelledby="details-title">
+    <div class="sheet-body" id="details-body"></div>
+  </dialog>
+
+  <script src="assets/common.js?v=3"></script>
+  <script src="assets/app.js?v=3"></script>
 </body>
 </html>

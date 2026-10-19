@@ -1,139 +1,139 @@
-const app = document.getElementById('app');
-const titleEl = document.getElementById('title');
-const updatedEl = document.getElementById('updated');
+const $ = (id) => document.getElementById(id);
+const app = $('app');
 const isPreview = new URLSearchParams(location.search).has('preview');
 
 let data = null;
+let colors = {};
 let liveTimer = null;
-let liveLectures = [];
 
 async function load() {
-  app.innerHTML = '<p class="loading">جاري تحميل الجدول…</p>';
   try {
     if (isPreview) {
       const draft = readDraft();
       data = normalizeData(draft && draft.data);
-      document.getElementById('preview-note').hidden = false;
+      $('preview-note').hidden = false;
     } else {
       data = await fetchPublished();
     }
   } catch {
     app.innerHTML = `
-      <div class="notice">
-        <p>تعذّر تحميل الجدول. تأكد من اتصالك بالإنترنت ثم أعد المحاولة.</p>
-        <button class="btn" type="button" data-action="retry">إعادة المحاولة</button>
+      <div class="state">
+        <p>ما قدرنا نحمّل الجدول. تأكد من الإنترنت وجرّب كمان مرة.</p>
+        <button class="btn btn-primary" type="button" data-action="retry">إعادة المحاولة</button>
       </div>`;
     return;
   }
-  updatedEl.textContent = isPreview ? '' : formatUpdated(data.updatedAt);
-  route();
-}
-
-function selectedBatch() {
-  const name = decodeURIComponent(location.hash.slice(1));
-  return name ? data.batches.find((b) => b.name === name) : null;
-}
-
-function route() {
+  $('title').textContent = data.title;
+  $('subtitle').textContent = data.subtitle;
+  $('subtitle').hidden = !data.subtitle;
+  document.title = data.subtitle ? `${data.title} · ${data.subtitle}` : data.title;
+  $('updated').textContent = isPreview ? '' : formatUpdated(data.updatedAt);
+  render();
   clearInterval(liveTimer);
-  if (!data) return;
-  const batch = selectedBatch();
-  if (batch) {
-    renderSchedule(batch);
-    liveTimer = setInterval(updateLive, 30000);
-  } else {
-    renderPicker();
-  }
+  liveTimer = setInterval(updateLive, 30000);
 }
 
-function renderPicker() {
-  titleEl.textContent = 'أنت من أي دفعة؟';
-  document.title = 'جدول المحاضرات';
-  if (!data.batches.length) {
-    app.innerHTML = '<p class="empty">لم يُنشر أي جدول بعد.</p>';
+function hourLabel(h) {
+  return `${h % 12 || 12} ${h < 12 ? 'ص' : 'م'}`;
+}
+
+function clock(t) {
+  const total = toMinutes(t);
+  return `${Math.floor(total / 60) % 12 || 12}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/* المحاضرات المتداخلة بنفس اليوم بتنقسم جنب بعض */
+function layoutDay(items) {
+  const out = [];
+  let cluster = [];
+  let clusterEnd = -1;
+  const flush = () => {
+    const lanes = [];
+    cluster.forEach((it) => {
+      let i = lanes.findIndex((end) => end <= it.start);
+      if (i === -1) { i = lanes.length; lanes.push(0); }
+      lanes[i] = it.end;
+      it.lane = i;
+    });
+    cluster.forEach((it) => { it.lanes = lanes.length; });
+    out.push(...cluster);
+    cluster = [];
+  };
+  items.forEach((it) => {
+    if (cluster.length && it.start >= clusterEnd) flush();
+    cluster.push(it);
+    clusterEnd = Math.max(clusterEnd, it.end);
+  });
+  if (cluster.length) flush();
+  return out;
+}
+
+function render() {
+  const lectures = data.lectures;
+  if (!lectures.length) {
+    app.innerHTML = '<p class="state">لسا ما انضافت محاضرات للجدول.</p>';
+    $('now').hidden = true;
     return;
   }
+  colors = subjectColors(lectures);
+  // أيام الدوام من السبت للخميس دايماً ظاهرة، والجمعة بس إذا فيها محاضرات
+  const days = DAYS.filter((d) => d.key !== 'fri' || lectures.some((l) => l.day === 'fri'));
+  const startHour = Math.floor(Math.min(...lectures.map((l) => toMinutes(l.from))) / 60);
+  let endHour = Math.ceil(Math.max(...lectures.map((l) => toMinutes(l.to))) / 60);
+  if (endHour - startHour < 4) endHour = Math.min(24, startHour + 4);
+  const hours = endHour - startHour;
+  const rangeStart = startHour * 60;
+  const total = hours * 60;
+  const pct = (m) => `${((m - rangeStart) / total) * 100}%`;
+
+  const head = days.map((d) => `
+    <div class="day-head" data-day="${d.key}">
+      <span class="full">${d.name}</span><span class="short">${d.short}</span>
+    </div>`).join('');
+
+  const axis = Array.from({ length: hours }, (_, i) => `<span style="top:${(i / hours) * 100}%">${hourLabel(startHour + i)}</span>`).join('');
+
+  const cols = days.map((d) => {
+    const items = layoutDay(lectures
+      .filter((l) => l.day === d.key)
+      .map((l) => ({ l, start: toMinutes(l.from), end: toMinutes(l.to) })));
+    const blocks = items.map(({ l, start, end, lane, lanes }) => `
+      <button type="button" class="lec" data-id="${l.id}" data-from="${start}" data-to="${end}"
+        style="--c:${colors[l.subject]};top:${pct(start)};height:${((end - start) / total) * 100}%;inset-inline-start:${(lane / lanes) * 100}%;width:${100 / lanes}%">
+        <span class="lec-name">${escapeHtml(l.subject)}</span>
+        <span class="lec-time">${clock(l.from)}<span class="lec-to"> – ${clock(l.to)}</span></span>
+        ${l.room ? `<span class="lec-room">${escapeHtml(l.room)}</span>` : ''}
+      </button>`).join('');
+    return `<div class="day-col" data-day="${d.key}">${blocks}<div class="now-line" hidden></div></div>`;
+  }).join('');
+
   app.innerHTML = `
-    <p class="lede">اختر دفعتك ليظهر جدول محاضراتك.</p>
-    <nav class="batches" aria-label="الدفعات">
-      ${data.batches.map((b) => `
-        <a class="batch" href="#${encodeURIComponent(b.name)}">
-          <span class="batch-label">دفعة</span>
-          <span class="batch-year">${escapeHtml(b.name)}</span>
-          <span class="batch-count">${lectureCountText(b.lectures.length)}</span>
-        </a>`).join('')}
-    </nav>`;
-}
-
-function renderSchedule(batch) {
-  titleEl.innerHTML = `دفعة <span class="title-year">${escapeHtml(batch.name)}</span>`;
-  document.title = `جدول دفعة ${batch.name}`;
-  liveLectures = batch.lectures.slice().sort(sortLectures);
-
-  const toolbar = `
-    <div class="toolbar">
-      <a class="btn" href="#">تغيير الدفعة</a>
-      ${liveLectures.length ? '<button class="btn" type="button" data-action="print">طباعة الجدول</button>' : ''}
-    </div>`;
-
-  if (!liveLectures.length) {
-    app.innerHTML = toolbar + `<p class="empty">لم يُضف جدول دفعة ${escapeHtml(batch.name)} بعد.</p>`;
-    return;
-  }
-
-  const hasRoom = liveLectures.some((l) => l.room);
-  const hasDoctor = liveLectures.some((l) => l.doctor);
-  const groups = DAYS
-    .map((d) => ({ day: d, items: liveLectures.filter((l) => l.day === d.key) }))
-    .filter((g) => g.items.length);
-
-  const body = groups.map((g) => `
-    <tbody class="day" data-day="${g.day.key}">
-      ${g.items.map((l, i) => {
-        const meta = [l.room, l.doctor].filter(Boolean).map(escapeHtml).join(' · ');
-        return `
-        <tr data-day="${l.day}" data-from="${toMinutes(l.from)}" data-to="${toMinutes(l.to)}">
-          ${i === 0 ? `
-          <th scope="rowgroup" rowspan="${g.items.length}" class="day-cell">
-            <span class="day-name">${g.day.name}</span>
-            <span class="today-tag">اليوم</span>
-          </th>` : ''}
-          <td class="t from">${timeHtml(l.from)}</td>
-          <td class="t to">${timeHtml(l.to)}</td>
-          <td class="subj">
-            <span class="subj-name">${escapeHtml(l.subject)}</span>
-            ${meta ? `<span class="meta">${meta}</span>` : ''}
-          </td>
-          ${hasRoom ? `<td class="extra">${escapeHtml(l.room) || '—'}</td>` : ''}
-          ${hasDoctor ? `<td class="extra">${escapeHtml(l.doctor) || '—'}</td>` : ''}
-        </tr>`;
-      }).join('')}
-    </tbody>`).join('');
-
-  app.innerHTML = toolbar + `
-    <section class="status" id="status" aria-live="polite"></section>
-    <table class="timetable">
-      <caption class="sr-only">جدول محاضرات دفعة ${escapeHtml(batch.name)}</caption>
-      <thead>
-        <tr>
-          <th scope="col">اليوم</th>
-          <th scope="col">من</th>
-          <th scope="col">إلى</th>
-          <th scope="col">المادة</th>
-          ${hasRoom ? '<th scope="col">القاعة</th>' : ''}
-          ${hasDoctor ? '<th scope="col">المحاضر</th>' : ''}
-        </tr>
-      </thead>
-      ${body}
-    </table>`;
+    <div class="board-scroll" id="board-scroll">
+    <div class="board" style="--days:${days.length};--hours:${hours}" data-start="${rangeStart}" data-total="${total}">
+      <div class="board-head"><div class="corner"></div>${head}</div>
+      <div class="board-body"><div class="axis">${axis}</div>${cols}</div>
+    </div>
+    </div>
+    <p class="board-hint">اضغط على أي محاضرة لتشوف تفاصيلها</p>`;
   updateLive();
+  scrollToToday();
 }
 
-/* يحدّد المحاضرة الحالية أو القادمة حسب ساعة الجهاز */
+/* على الجوال الجدول بينسحب لجنب؛ نخلّي عمود اليوم أول عمود جنب الساعات */
+function scrollToToday() {
+  const sc = $('board-scroll');
+  const col = sc && sc.querySelector('.day-col.is-today');
+  if (!col || sc.scrollWidth <= sc.clientWidth) return;
+  const axis = sc.querySelector('.axis').getBoundingClientRect();
+  sc.scrollLeft += col.getBoundingClientRect().right - axis.left;
+}
+
+/* يحدّد المحاضرة الحالية أو الجاية حسب ساعة الجهاز */
 function computeStatus(now) {
+  const lectures = data.lectures;
   const tk = todayKey(now);
   const mins = now.getHours() * 60 + now.getMinutes();
-  const today = liveLectures.filter((l) => l.day === tk);
+  const today = lectures.filter((l) => l.day === tk);
 
   const current = today.find((l) => toMinutes(l.from) <= mins && mins < toMinutes(l.to));
   if (current) return { type: 'now', lecture: current, left: toMinutes(current.to) - mins };
@@ -144,66 +144,93 @@ function computeStatus(now) {
   const ti = DAY_ORDER[tk];
   for (let k = 1; k <= 7; k++) {
     const day = DAYS[(ti + k) % 7].key;
-    const first = liveLectures.find((l) => l.day === day);
+    const first = lectures.find((l) => l.day === day);
     if (first) return { type: today.length ? 'done' : 'free', lecture: first, offset: k };
   }
   return null;
 }
 
-function statusHtml(st) {
-  if (!st) return '';
+function nowHtml(st) {
   const l = st.lecture;
-  const place = [l.room, l.doctor].filter(Boolean).map(escapeHtml).join(' · ');
-  const placeHtml = place ? ` · ${place}` : '';
   const subject = escapeHtml(l.subject);
-
+  const place = l.room ? ` · ${escapeHtml(l.room)}` : '';
   if (st.type === 'now') {
     return `
-      <p class="status-eyebrow">الآن</p>
-      <p class="status-title"><span class="hl">${subject}</span></p>
-      <p class="status-meta">تنتهي ${timeText(l.to)} · باقي ${durationText(st.left)}${placeHtml}</p>`;
+      <span class="now-label"><i class="pulse"></i>هلأ عندك</span>
+      <strong class="now-title">${subject}</strong>
+      <span class="now-meta">بتخلص ${timeText(l.to)} · باقي ${durationText(st.left)}${place}</span>`;
   }
   if (st.type === 'next') {
     return `
-      <p class="status-eyebrow">المحاضرة القادمة اليوم</p>
-      <p class="status-title">${subject}</p>
-      <p class="status-meta">تبدأ ${timeText(l.from)} · بعد ${durationText(st.wait)}${placeHtml}</p>`;
+      <span class="now-label">المحاضرة الجاية اليوم</span>
+      <strong class="now-title">${subject}</strong>
+      <span class="now-meta">الساعة ${timeText(l.from)} · بعد ${durationText(st.wait)}${place}</span>`;
   }
-  const when = st.offset === 1 ? 'غداً' : `يوم ${dayName(l.day)}`;
+  const when = st.offset === 1 ? 'بكرة' : `يوم ${dayName(l.day)}`;
   return `
-    <p class="status-eyebrow">${st.type === 'done' ? 'انتهت محاضرات اليوم' : 'لا محاضرات اليوم'} · القادمة</p>
-    <p class="status-title">${subject}</p>
-    <p class="status-meta">${when} ${timeText(l.from)}${placeHtml}</p>`;
+    <span class="now-label">${st.type === 'done' ? 'خلصت محاضرات اليوم' : 'ما في محاضرات اليوم'} · الجاية</span>
+    <strong class="now-title">${subject}</strong>
+    <span class="now-meta">${when} الساعة ${timeText(l.from)}${place}</span>`;
 }
 
 function updateLive() {
-  const statusEl = document.getElementById('status');
-  if (!statusEl) return;
+  if (!data || !data.lectures.length) return;
   const now = new Date();
   const tk = todayKey(now);
   const mins = now.getHours() * 60 + now.getMinutes();
 
-  app.querySelectorAll('tbody.day').forEach((tb) => tb.classList.toggle('is-today', tb.dataset.day === tk));
-  app.querySelectorAll('tbody.day tr').forEach((tr) => {
-    const isToday = tr.dataset.day === tk;
-    const from = Number(tr.dataset.from);
-    const to = Number(tr.dataset.to);
-    tr.classList.toggle('is-now', isToday && from <= mins && mins < to);
-    tr.classList.toggle('is-past', isToday && mins >= to);
+  const st = computeStatus(now);
+  $('now').hidden = !st;
+  if (st) $('now').innerHTML = nowHtml(st);
+
+  const board = app.querySelector('.board');
+  if (!board) return;
+  const start = Number(board.dataset.start);
+  const total = Number(board.dataset.total);
+  board.querySelectorAll('[data-day]').forEach((el) => el.classList.toggle('is-today', el.dataset.day === tk));
+  board.querySelectorAll('.day-col').forEach((col) => {
+    const isToday = col.dataset.day === tk;
+    col.querySelectorAll('.lec').forEach((b) => {
+      b.classList.toggle('is-now', isToday && Number(b.dataset.from) <= mins && mins < Number(b.dataset.to));
+      b.classList.toggle('is-past', isToday && mins >= Number(b.dataset.to));
+    });
+    const line = col.querySelector('.now-line');
+    const inRange = isToday && mins >= start && mins <= start + total;
+    line.hidden = !inRange;
+    if (inRange) line.style.top = `${((mins - start) / total) * 100}%`;
   });
-  statusEl.innerHTML = statusHtml(computeStatus(now));
+}
+
+function openDetails(id) {
+  const l = data.lectures.find((x) => x.id === id);
+  if (!l) return;
+  const minutes = toMinutes(l.to) - toMinutes(l.from);
+  const facts = [
+    ['اليوم', dayName(l.day)],
+    ['الوقت', `${timeText(l.from)} – ${timeText(l.to)}`],
+    ['المدة', durationText(minutes)],
+    l.room && ['القاعة', escapeHtml(l.room)],
+    l.doctor && ['المحاضر', escapeHtml(l.doctor)],
+  ].filter(Boolean);
+  $('details-body').innerHTML = `
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <p class="sheet-tag" style="--c:${colors[l.subject]}"><i></i>محاضرة</p>
+    <h2 id="details-title">${escapeHtml(l.subject)}</h2>
+    <dl class="facts">
+      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}
+    </dl>
+    <button class="btn btn-primary btn-block" type="button" data-action="close-details">تمام</button>`;
+  $('details').showModal();
 }
 
 app.addEventListener('click', (e) => {
-  const action = e.target.closest('[data-action]');
-  if (!action) return;
-  if (action.dataset.action === 'print') window.print();
-  if (action.dataset.action === 'retry') load();
+  const lec = e.target.closest('.lec');
+  if (lec) return openDetails(lec.dataset.id);
+  if (e.target.closest('[data-action="retry"]')) load();
 });
 
-window.addEventListener('hashchange', () => {
-  route();
-  window.scrollTo(0, 0);
+$('details').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget || e.target.closest('[data-action="close-details"]')) $('details').close();
 });
 
 document.addEventListener('visibilitychange', () => {

@@ -1,32 +1,25 @@
 {
-  "updatedAt": "2026-10-19T19:33:05.291Z",
-  "batches": [
+  "updatedAt": "2026-10-19T20:55:36.744Z",
+  "title": "جدول المحاضرات",
+  "subtitle": "دفعة 2025",
+  "lectures": [
     {
-      "name": "2025",
-      "lectures": [
-        {
-          "id": "mvfkmvjopgoup",
-          "day": "tue",
-          "from": "11:00",
-          "to": "12:00",
-          "subject": "دراسات فلسطينة",
-          "room": "",
-          "doctor": ""
-        },
-        {
-          "id": "mvflepz3rrzf5",
-          "day": "tue",
-          "from": "13:00",
-          "to": "14:00",
-          "subject": "مقدمه في الذكاء الاصطناعي",
-          "room": "",
-          "doctor": ""
-        }
-      ]
+      "id": "mvfkmvjopgoup",
+      "day": "tue",
+      "from": "11:00",
+      "to": "12:00",
+      "subject": "دراسات فلسطينة",
+      "room": "",
+      "doctor": ""
     },
     {
-      "name": "2026",
-      "lectures": []
+      "id": "mvflepz3rrzf5",
+      "day": "tue",
+      "from": "13:00",
+      "to": "14:00",
+      "subject": "مقدمه في الذكاء الاصطناعي نظري",
+      "room": "",
+      "doctor": ""
     }
   ]
 }

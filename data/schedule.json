@@ -1,7 +1,23 @@
 {
-  "updatedAt": null,
+  "updatedAt": "2026-10-19T18:28:56.151Z",
   "batches": [
-    { "name": "2025", "lectures": [] },
-    { "name": "2026", "lectures": [] }
+    {
+      "name": "2025",
+      "lectures": [
+        {
+          "id": "mvfkmvjopgoup",
+          "day": "tue",
+          "from": "11:00",
+          "to": "12:00",
+          "subject": "دراسات فلسطينة",
+          "room": "",
+          "doctor": ""
+        }
+      ]
+    },
+    {
+      "name": "2026",
+      "lectures": []
+    }
   ]
 }

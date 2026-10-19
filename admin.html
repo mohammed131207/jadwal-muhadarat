@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>لوحة الإدارة · جدول المحاضرات</title>
+  <meta name="theme-color" content="#123B2E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23123B2E'/%3E%3Crect x='12' y='26' width='40' height='14' rx='3' fill='%23F7DE4B'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Readex+Pro:wght@300..600&family=Reem+Kufi:wght@500..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="sheet">
+    <header class="masthead">
+      <p class="eyebrow">جدول المحاضرات</p>
+      <h1>لوحة الإدارة</h1>
+    </header>
+
+    <main>
+      <!-- تسجيل الدخول -->
+      <section id="login" hidden>
+        <form id="login-form" class="card login-card">
+          <div class="field">
+            <label for="pass">كلمة السر</label>
+            <input id="pass" type="password" autocomplete="current-password" required>
+          </div>
+          <p class="error" id="login-error" role="alert"></p>
+          <button class="btn btn-primary" type="submit">دخول</button>
+        </form>
+        <p><a class="admin-link" href="./">الرجوع للجدول</a></p>
+      </section>
+
+      <!-- المحرر -->
+      <section id="editor" hidden>
+        <div class="notice" id="load-error" role="alert" hidden>
+          <p>تعذّر تحميل الجدول المنشور. تأكد من الاتصال بالإنترنت ثم أعد المحاولة.</p>
+          <button class="btn" type="button" id="retry-load">إعادة المحاولة</button>
+        </div>
+        <p class="loading" id="loading">جاري تحميل الجدول…</p>
+
+        <div id="workspace" hidden>
+        <div class="admin-links">
+          <a href="./" target="_blank" rel="noopener">عرض الجدول المنشور</a>
+          <a href="./?preview=1" target="_blank" rel="noopener">معاينة التعديلات</a>
+          <span class="spacer"></span>
+          <button class="link-btn" type="button" id="logout">تسجيل الخروج</button>
+        </div>
+
+        <div class="batch-bar">
+          <div class="tabs" id="tabs" role="group" aria-label="الدفعات"></div>
+          <form class="inline-form" id="batch-form">
+            <label class="sr-only" for="batch-name">اسم الدفعة الجديدة</label>
+            <input id="batch-name" placeholder="مثلاً 2027" autocomplete="off">
+            <button class="btn" type="submit">إضافة دفعة</button>
+          </form>
+        </div>
+
+        <p class="empty" id="no-batches" hidden>لا توجد دفعات. أضف دفعة من الحقل بالأعلى للبدء.</p>
+
+        <div class="editor-grid" id="editor-grid">
+          <form class="card" id="lecture-form" novalidate>
+            <h2 id="form-title">إضافة محاضرة</h2>
+            <div class="field">
+              <label for="f-day">اليوم</label>
+              <select id="f-day" required></select>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="f-from">من</label>
+                <input id="f-from" type="time" required>
+              </div>
+              <div class="field">
+                <label for="f-to">إلى</label>
+                <input id="f-to" type="time" required>
+              </div>
+            </div>
+            <div class="field">
+              <label for="f-subject">المادة</label>
+              <input id="f-subject" list="subjects" autocomplete="off" required>
+              <datalist id="subjects"></datalist>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="f-room">القاعة <span class="optional">(اختياري)</span></label>
+                <input id="f-room" list="rooms" autocomplete="off">
+                <datalist id="rooms"></datalist>
+              </div>
+              <div class="field">
+                <label for="f-doctor">المحاضر <span class="optional">(اختياري)</span></label>
+                <input id="f-doctor" list="doctors" autocomplete="off">
+                <datalist id="doctors"></datalist>
+              </div>
+            </div>
+            <p class="error" id="form-error" role="alert"></p>
+            <div class="actions">
+              <button class="btn btn-primary" type="submit" id="submit-btn">إضافة المحاضرة</button>
+              <button class="btn" type="button" id="cancel-edit" hidden>إلغاء التعديل</button>
+            </div>
+          </form>
+
+          <section class="card">
+            <div class="list-head">
+              <h2 id="list-title">المحاضرات</h2>
+              <button class="btn btn-danger btn-sm" type="button" id="delete-batch">حذف الدفعة</button>
+            </div>
+            <div id="lecture-list"></div>
+          </section>
+        </div>
+
+        <details class="card tools">
+          <summary>نسخة احتياطية وإعدادات النشر</summary>
+          <div class="tools-body">
+            <div>
+              <p>نزّل نسخة من الجدول على جهازك، أو استرجع نسخة سابقة.</p>
+              <div class="actions">
+                <button class="btn btn-sm" type="button" id="export">تنزيل نسخة</button>
+                <label class="btn btn-sm" for="import-file" style="margin:0;color:var(--ink)">استرجاع نسخة</label>
+                <input class="sr-only" type="file" id="import-file" accept="application/json,.json">
+              </div>
+            </div>
+            <div>
+              <p id="token-state"></p>
+              <div class="actions">
+                <button class="btn btn-sm" type="button" id="token-change">ربط GitHub</button>
+                <button class="btn btn-sm btn-danger" type="button" id="token-forget">إزالة الربط من هذا الجهاز</button>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div class="publish-bar" id="publish-bar">
+          <p id="publish-state"></p>
+          <button class="btn btn-sm" type="button" id="discard">تجاهل التعديلات</button>
+          <button class="btn btn-primary btn-sm" type="button" id="publish">نشر التعديلات</button>
+        </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="token-dialog" aria-labelledby="token-title">
+    <form method="dialog" id="token-form">
+      <h2 id="token-title">ربط لوحة الإدارة بـ GitHub</h2>
+      <p>الجدول محفوظ في مستودع الموقع على GitHub، والنشر يحتاج مفتاح وصول (توكن) مرة واحدة على هذا الجهاز.</p>
+      <ol>
+        <li><a id="token-link" target="_blank" rel="noopener">افتح صفحة إنشاء التوكن</a> وسجّل دخول بحساب GitHub صاحب الموقع.</li>
+        <li>تحت <b class="ltr">Repository access</b> اختر <b class="ltr">Only select repositories</b> ثم اختر <b class="ltr" id="token-repo"></b>.</li>
+        <li>تحت <b class="ltr">Permissions</b> اجعل <b class="ltr">Contents</b> على <b class="ltr">Read and write</b>.</li>
+        <li>اضغط <b class="ltr">Generate token</b>، انسخ التوكن والصقه هنا.</li>
+      </ol>
+      <div class="field">
+        <label for="token-input">التوكن</label>
+        <input id="token-input" type="password" class="ltr" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      </div>
+      <p class="error" id="token-error" role="alert"></p>
+      <div class="actions">
+        <button class="btn btn-primary" type="submit" value="save" id="token-save">حفظ ونشر</button>
+        <button class="btn" type="submit" value="cancel" formnovalidate>إلغاء</button>
+      </div>
+      <p class="fine">التوكن يُحفظ في هذا المتصفح فقط ولا يُرسل إلا إلى GitHub.</p>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="assets/common.js"></script>
+  <script src="assets/admin.js"></script>
+</body>
+</html>

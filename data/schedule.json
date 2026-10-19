@@ -1,8 +1,35 @@
 {
-  "updatedAt": "2026-10-19T21:08:37.179Z",
+  "updatedAt": "2026-10-19T21:16:00.072Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
+    {
+      "id": "mvfr6u3q9vrbv",
+      "day": "sat",
+      "from": "13:00",
+      "to": "14:00",
+      "subject": "مهارات الاتصال والقيادة",
+      "room": "",
+      "doctor": ""
+    },
+    {
+      "id": "mvfr7g5yyjuxt",
+      "day": "sun",
+      "from": "11:00",
+      "to": "12:00",
+      "subject": "دراسات فلسطينية",
+      "room": "",
+      "doctor": ""
+    },
+    {
+      "id": "mvfr6drvqe36a",
+      "day": "mon",
+      "from": "12:00",
+      "to": "13:00",
+      "subject": "الكترونيات",
+      "room": "",
+      "doctor": ""
+    },
     {
       "id": "mvfkmvjopgoup",
       "day": "tue",
@@ -15,9 +42,36 @@
     {
       "id": "mvflepz3rrzf5",
       "day": "tue",
+      "from": "12:00",
+      "to": "13:00",
+      "subject": "مقدمه في الذكاء الاصطناعي نظري",
+      "room": "",
+      "doctor": ""
+    },
+    {
+      "id": "mvfr1u1k9rh0v",
+      "day": "tue",
       "from": "13:00",
       "to": "14:00",
-      "subject": "مقدمه في الذكاء الاصطناعي نظري",
+      "subject": "هياكل البيانات نظري",
+      "room": "",
+      "doctor": ""
+    },
+    {
+      "id": "mvfr3hh0e4mtw",
+      "day": "wed",
+      "from": "12:00",
+      "to": "14:00",
+      "subject": "هياكل بيانات عملي",
+      "room": "",
+      "doctor": ""
+    },
+    {
+      "id": "mvfr5691ogsfh",
+      "day": "thu",
+      "from": "11:00",
+      "to": "12:00",
+      "subject": "الامن السيبراني عملي ونظري",
       "room": "",
       "doctor": ""
     },
@@ -27,6 +81,15 @@
       "from": "12:00",
       "to": "14:00",
       "subject": "مقدة في الذكاء الاصطناعي عملي",
+      "room": "",
+      "doctor": ""
+    },
+    {
+      "id": "mvfr5ytlciu2d",
+      "day": "thu",
+      "from": "16:30",
+      "to": "17:30",
+      "subject": "اداب واخلاقيات المهنة",
       "room": "",
       "doctor": ""
     }

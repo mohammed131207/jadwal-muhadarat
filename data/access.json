@@ -2,7 +2,7 @@
   "v": 1,
   "kdf": "PBKDF2-SHA256",
   "iterations": 600000,
-  "salt": "KnP6HSrYf+74bgG17GB3KQ==",
-  "iv": "8YASXdqXoxkIzzc/",
-  "data": "FFW87gCXO6Hh4pRT5PnThTM/USdj9zS+u9MLlriMkKuDzZavoUK+pwHN95CCQpRaTQ5rv6kitbcJzMIXD1QyuE6ut1TnYOXJnMkxtjJT7/ppzG97b00K3GQZP7doNHJ7JQoXiy0hGkUSTmT0sg=="
+  "salt": "fBUusr31kWtia6pYLTIZDg==",
+  "iv": "LTVE/qctLMJ/WKXD",
+  "data": "xC95VPFU73zR7jY6lS3subVPGNPEVCKpwrC45jdt/W9uUhGWBO4cuX+4HQUkYLIHawq7TrMOEsUdTOg9cgketkMTsZRLvyqno+/YVsxAUdPO4RiyOayMuxDLwtkGLwupN/EphDxIoyUMor7/aQ=="
 }

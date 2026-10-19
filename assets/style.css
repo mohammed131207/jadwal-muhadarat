@@ -631,6 +631,7 @@ dialog ol { padding-inline-start: 1.3rem; }
 dialog li { margin-bottom: 6px; }
 .fine { font-size: 0.82rem; color: var(--muted); }
 code, .ltr { direction: ltr; unicode-bidi: isolate; }
+dialog b.ltr { white-space: nowrap; }
 
 .toast {
   position: fixed;

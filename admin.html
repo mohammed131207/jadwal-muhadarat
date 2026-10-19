@@ -28,7 +28,7 @@
             <input id="pass" type="password" autocomplete="current-password" required>
           </div>
           <p class="error" id="login-error" role="alert"></p>
-          <button class="btn btn-primary" type="submit">دخول</button>
+          <button class="btn btn-primary" type="submit" id="login-btn">دخول</button>
         </form>
         <p><a class="admin-link" href="./">الرجوع للجدول</a></p>
       </section>
@@ -125,7 +125,6 @@
               <p id="token-state"></p>
               <div class="actions">
                 <button class="btn btn-sm" type="button" id="token-change">ربط GitHub</button>
-                <button class="btn btn-sm btn-danger" type="button" id="token-forget">إزالة الربط من هذا الجهاز</button>
               </div>
             </div>
           </div>
@@ -143,8 +142,8 @@
 
   <dialog id="token-dialog" aria-labelledby="token-title">
     <form method="dialog" id="token-form">
-      <h2 id="token-title">ربط لوحة الإدارة بـ GitHub</h2>
-      <p>الجدول محفوظ في مستودع الموقع على GitHub، والنشر يحتاج مفتاح وصول (توكن) مرة واحدة على هذا الجهاز.</p>
+      <h2 id="token-title">ربط النشر بـ GitHub (مرة واحدة)</h2>
+      <p>هذه الخطوة يقوم بها صاحب حساب GitHub للموقع مرة واحدة فقط. بعدها يستطيع أي شخص يعرف كلمة سر اللوحة النشر من أي جهاز بدون توكن.</p>
       <ol>
         <li><a id="token-link" target="_blank" rel="noopener">افتح صفحة إنشاء التوكن</a> وسجّل دخول بحساب GitHub صاحب الموقع.</li>
         <li>تحت <b class="ltr">Repository access</b> اختر <b class="ltr">Only select repositories</b> ثم اختر <b class="ltr" id="token-repo"></b>.</li>
@@ -157,10 +156,10 @@
       </div>
       <p class="error" id="token-error" role="alert"></p>
       <div class="actions">
-        <button class="btn btn-primary" type="submit" value="save" id="token-save">حفظ ونشر</button>
+        <button class="btn btn-primary" type="submit" value="save" id="token-save">ربط</button>
         <button class="btn" type="submit" value="cancel" formnovalidate>إلغاء</button>
       </div>
-      <p class="fine">التوكن يُحفظ في هذا المتصفح فقط ولا يُرسل إلا إلى GitHub.</p>
+      <p class="fine">التوكن يُحفظ في الموقع مشفّراً بكلمة سر اللوحة، وصلاحيته مقتصرة على تعديل ملفات هذا المستودع.</p>
     </form>
   </dialog>
 

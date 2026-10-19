@@ -4,6 +4,8 @@ const CONFIG = {
   repo: 'jadwal-muhadarat',
   branch: 'main',
   dataPath: 'data/schedule.json',
+  // توكن GitHub مشفّر بكلمة سر اللوحة، حتى ينشر أي مشرف بكلمة السر فقط
+  accessPath: 'data/access.json',
 };
 
 /* الأسبوع الدراسي يبدأ من السبت. js = رقم اليوم في Date.getDay() */

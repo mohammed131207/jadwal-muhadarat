@@ -1,7 +1,7 @@
-/* بصمة SHA-256 لكلمة سر لوحة الإدارة (كلمة السر نفسها مش مكتوبة بالكود) */
-const PASS_HASH = '5ffed2e1bd56b37e3a974a269a1c26a9af87f6854ca60448473a729256ee040f';
-const SESSION_KEY = 'jadwal.admin';
-const TOKEN_KEY = 'jadwal.ghToken';
+/* بصمة PBKDF2 لكلمة سر لوحة الإدارة (كلمة السر نفسها مش مكتوبة بالكود) */
+const PASS_VERIFIER = '42acc915ab285f99acb3eda643ad37d342d734c890ba303f5c42d397d039c9b5';
+const PASS_SALT = 'jadwal-muhadarat:login';
+const PBKDF2_ITERATIONS = 600000;
 const TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new?' + new URLSearchParams({
   name: CONFIG.repo,
   description: 'نشر جدول المحاضرات من لوحة الإدارة',
@@ -18,33 +18,67 @@ let currentBatch = null;
 let editingId = null;
 let busy = false;
 let draftWarned = false;
+/* كلمة السر والتوكن بالذاكرة فقط طول ما الصفحة مفتوحة؛ تحديث الصفحة يطلب الدخول من جديد */
+let loginPassword = null;
+let token = null;
+let linked = false;
 
-/* ---------- تخزين ---------- */
-function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+/* ---------- تشفير ---------- */
+const bytesToB64 = (bytes) => btoa(String.fromCharCode(...bytes));
+const b64ToBytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function pbkdf2(password, salt, iterations, usage) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, [usage === 'bits' ? 'deriveBits' : 'deriveKey']);
+  const params = { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' };
+  if (usage === 'bits') return new Uint8Array(await crypto.subtle.deriveBits(params, base, 256));
+  return crypto.subtle.deriveKey(params, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
-function setToken(t) {
-  try { localStorage.setItem(TOKEN_KEY, t); } catch {}
+
+async function checkPassword(password) {
+  const bits = await pbkdf2(password, new TextEncoder().encode(PASS_SALT), PBKDF2_ITERATIONS, 'bits');
+  return [...bits].map((b) => b.toString(16).padStart(2, '0')).join('') === PASS_VERIFIER;
 }
-function forgetToken() {
-  try { localStorage.removeItem(TOKEN_KEY); } catch {}
+
+async function encryptToken(value, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await pbkdf2(password, salt, PBKDF2_ITERATIONS, 'key');
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(value));
+  return {
+    v: 1,
+    kdf: 'PBKDF2-SHA256',
+    iterations: PBKDF2_ITERATIONS,
+    salt: bytesToB64(salt),
+    iv: bytesToB64(iv),
+    data: bytesToB64(new Uint8Array(cipher)),
+  };
 }
-function isLoggedIn() {
-  try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
+
+async function decryptToken(blob, password) {
+  const key = await pbkdf2(password, b64ToBytes(blob.salt), blob.iterations, 'key');
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(blob.iv) }, key, b64ToBytes(blob.data));
+  return new TextDecoder().decode(plain);
 }
-function setLoggedIn(on) {
-  try {
-    if (on) sessionStorage.setItem(SESSION_KEY, '1');
-    else sessionStorage.removeItem(SESSION_KEY);
-  } catch {}
+
+/* يرجّع ملف التوكن المشفّر من الموقع، أو null إذا لسا ما انربط */
+async function fetchAccess() {
+  const res = await fetch(`${CONFIG.accessPath}?v=${Date.now()}`, { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/* يفك التوكن المحفوظ بكلمة السر؛ يرجّع null إذا ما في ربط */
+async function unlockToken() {
+  if (token) return token;
+  const blob = await fetchAccess();
+  linked = Boolean(blob);
+  if (!blob) return null;
+  token = await decryptToken(blob, loginPassword);
+  return token;
 }
 
 /* ---------- أدوات ---------- */
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 function b64encode(text) {
   const bytes = new TextEncoder().encode(text);
   let bin = '';
@@ -92,24 +126,24 @@ async function ghRequest(path, token, options = {}) {
   return body;
 }
 
-async function getRemoteFile(token) {
-  const file = await ghRequest(`contents/${CONFIG.dataPath}?ref=${CONFIG.branch}`, token);
+async function getRemoteFile(token, path = CONFIG.dataPath) {
+  const file = await ghRequest(`contents/${path}?ref=${CONFIG.branch}`, token);
   return { sha: file.sha, text: b64decode(file.content) };
 }
 
-async function putFile(token, text) {
+async function putFile(token, text, path = CONFIG.dataPath, message = 'تحديث جدول المحاضرات') {
   for (let attempt = 0; ; attempt++) {
     let sha;
     try {
-      sha = (await getRemoteFile(token)).sha;
+      sha = (await getRemoteFile(token, path)).sha;
     } catch (err) {
       if (err.status !== 404) throw err;
     }
     try {
-      return await ghRequest(`contents/${CONFIG.dataPath}`, token, {
+      return await ghRequest(`contents/${path}`, token, {
         method: 'PUT',
         body: JSON.stringify({
-          message: 'تحديث جدول المحاضرات',
+          message,
           content: b64encode(text),
           branch: CONFIG.branch,
           ...(sha ? { sha } : {}),
@@ -131,7 +165,6 @@ async function loadData() {
     dirty = true;
     return;
   }
-  const token = getToken();
   if (token) {
     try {
       data = normalizeData(JSON.parse((await getRemoteFile(token)).text));
@@ -224,12 +257,10 @@ function renderPublishBar() {
 }
 
 function renderTokenState() {
-  const linked = Boolean(getToken());
   $('token-state').textContent = linked
-    ? 'هذا الجهاز مربوط بـ GitHub ويستطيع النشر.'
-    : 'هذا الجهاز غير مربوط بـ GitHub بعد. سيُطلب التوكن عند أول نشر.';
-  $('token-change').textContent = linked ? 'تغيير التوكن' : 'ربط GitHub';
-  $('token-forget').hidden = !linked;
+    ? 'النشر مربوط بـ GitHub: أي شخص يعرف كلمة سر اللوحة يستطيع النشر من أي جهاز.'
+    : 'النشر غير مربوط بـ GitHub بعد. أول نشر سيطلب ربطه مرة واحدة.';
+  $('token-change').textContent = linked ? 'تغيير توكن GitHub' : 'ربط GitHub';
 }
 
 /* ---------- النموذج ---------- */
@@ -361,22 +392,30 @@ function setBusy(on) {
 }
 
 async function publish() {
-  const token = getToken();
-  if (!token) return openTokenDialog();
   setBusy(true);
   try {
+    let t;
+    try {
+      t = await unlockToken();
+    } catch (err) {
+      // فشل فك التشفير: التوكن المحفوظ مقفول بكلمة سر غير الحالية
+      if (err.name === 'OperationError') return openTokenDialog('توكن GitHub المحفوظ مقفول بكلمة سر مختلفة. اربط GitHub من جديد.');
+      throw err;
+    }
+    if (!t) return openTokenDialog();
     const payload = { updatedAt: new Date().toISOString(), batches: data.batches };
-    await putFile(token, JSON.stringify(payload, null, 2) + '\n');
+    await putFile(t, JSON.stringify(payload, null, 2) + '\n');
     data.updatedAt = payload.updatedAt;
     dirty = false;
     clearDraft();
     toast('تم النشر. يظهر للطلاب خلال دقيقة تقريباً.');
   } catch (err) {
     if (err.status === 401) {
-      forgetToken();
-      openTokenDialog('التوكن غير صالح أو انتهت صلاحيته. أنشئ توكن جديداً.');
+      token = null;
+      openTokenDialog('توكن GitHub المحفوظ انتهت صلاحيته أو أُلغي. أنشئ توكن جديداً واربطه.');
     } else if (err.status === 403 || err.status === 404) {
-      openTokenDialog(`التوكن لا يملك صلاحية الكتابة على مستودع ${CONFIG.repo}. أنشئه من جديد حسب الخطوات.`);
+      token = null;
+      openTokenDialog(`توكن GitHub المحفوظ لا يملك صلاحية الكتابة على مستودع ${CONFIG.repo}. أنشئ توكن جديداً حسب الخطوات.`);
     } else {
       toast('تعذّر النشر. تأكد من الاتصال بالإنترنت ثم حاول مرة ثانية؛ تعديلاتك محفوظة على هذا الجهاز.', true);
     }
@@ -396,38 +435,50 @@ $('discard').addEventListener('click', async () => {
   toast('رجعت اللوحة للجدول المنشور.');
 });
 
-/* ---------- التوكن ---------- */
+/* ---------- ربط GitHub (مرة واحدة لكل الموقع) ---------- */
 function openTokenDialog(message = '') {
   $('token-error').textContent = message;
   $('token-input').value = '';
-  $('token-save').textContent = dirty ? 'حفظ ونشر' : 'حفظ';
-  $('token-dialog').showModal();
+  $('token-save').textContent = dirty ? 'ربط ونشر' : 'ربط';
+  if (!$('token-dialog').open) $('token-dialog').showModal();
   $('token-input').focus();
 }
 
-$('token-form').addEventListener('submit', (e) => {
+$('token-form').addEventListener('submit', async (e) => {
   if (e.submitter && e.submitter.value === 'cancel') return;
   e.preventDefault();
-  const token = $('token-input').value.trim();
-  if (!/^(github_pat_|ghp_)\w{20,}$/.test(token)) {
+  const value = $('token-input').value.trim();
+  if (!/^(github_pat_|ghp_)\w{20,}$/.test(value)) {
     $('token-error').textContent = 'هذا لا يشبه توكن GitHub. التوكن يبدأ بـ github_pat_';
     return;
   }
-  setToken(token);
-  $('token-dialog').close();
-  renderTokenState();
-  if (dirty) publish();
-  else toast('تم ربط GitHub على هذا الجهاز.');
+  const save = $('token-save');
+  save.disabled = true;
+  save.textContent = 'جاري الربط…';
+  $('token-error').textContent = '';
+  try {
+    // التوكن ينحفظ بالمستودع مشفّراً بكلمة سر اللوحة؛ الحفظ نفسه يتأكد إن عنده صلاحية الكتابة
+    const blob = await encryptToken(value, loginPassword);
+    await putFile(value, JSON.stringify(blob, null, 2) + '\n', CONFIG.accessPath, 'ربط لوحة الإدارة بـ GitHub');
+    token = value;
+    linked = true;
+    $('token-dialog').close();
+    renderTokenState();
+    if (dirty) publish();
+    else toast('تم الربط. أي شخص يعرف كلمة سر اللوحة يستطيع النشر الآن من أي جهاز.');
+  } catch (err) {
+    $('token-error').textContent = err.status === 401
+      ? 'GitHub رفض هذا التوكن. تأكد أنك نسخته كاملاً.'
+      : err.status === 403 || err.status === 404
+        ? `التوكن لا يملك صلاحية الكتابة على مستودع ${CONFIG.repo}. راجع الخطوتين 2 و3.`
+        : 'تعذّر الاتصال بـ GitHub. تأكد من الإنترنت ثم حاول مرة ثانية.';
+  } finally {
+    save.disabled = false;
+    save.textContent = dirty ? 'ربط ونشر' : 'ربط';
+  }
 });
 
 $('token-change').addEventListener('click', () => openTokenDialog());
-
-$('token-forget').addEventListener('click', () => {
-  if (!confirm('إزالة التوكن من هذا الجهاز؟ ستحتاج إدخاله من جديد للنشر.')) return;
-  forgetToken();
-  renderTokenState();
-  toast('أُزيل الربط من هذا الجهاز.');
-});
 
 /* ---------- نسخة احتياطية ---------- */
 $('export').addEventListener('click', () => {
@@ -489,19 +540,36 @@ $('login-form').addEventListener('submit', async (e) => {
     $('login-error').textContent = 'افتح لوحة الإدارة من رابط الموقع (https) حتى يعمل تسجيل الدخول.';
     return;
   }
-  if ((await sha256($('pass').value)) !== PASS_HASH) {
-    $('login-error').textContent = 'كلمة السر غير صحيحة.';
-    $('pass').select();
-    return;
+  const btn = $('login-btn');
+  btn.disabled = true;
+  btn.textContent = 'جاري الدخول…';
+  try {
+    const password = $('pass').value;
+    if (!(await checkPassword(password))) {
+      $('login-error').textContent = 'كلمة السر غير صحيحة.';
+      $('pass').select();
+      return;
+    }
+    $('login-error').textContent = '';
+    $('pass').value = '';
+    loginPassword = password;
+    token = null;
+    try {
+      await unlockToken();
+    } catch {
+      // ما قدرنا نفك أو نجيب التوكن هلأ؛ زر النشر بيحاول مرة ثانية ويوضّح السبب
+    }
+    showEditor();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'دخول';
   }
-  $('login-error').textContent = '';
-  $('pass').value = '';
-  setLoggedIn(true);
-  showEditor();
 });
 
 $('logout').addEventListener('click', () => {
-  setLoggedIn(false);
+  loginPassword = null;
+  token = null;
+  linked = false;
   showLogin();
 });
 
@@ -511,5 +579,4 @@ $('f-day').innerHTML = DAYS.map((d) => `<option value="${d.key}">${d.name}</opti
 $('token-link').href = TOKEN_URL;
 $('token-repo').textContent = CONFIG.repo;
 
-if (isLoggedIn()) showEditor();
-else showLogin();
+showLogin();

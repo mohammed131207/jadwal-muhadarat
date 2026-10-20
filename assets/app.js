@@ -4,6 +4,7 @@ const isPreview = new URLSearchParams(location.search).has('preview');
 
 let data = null;
 let colors = {};
+let conflicts = {};
 let liveTimer = null;
 
 async function load() {
@@ -76,6 +77,7 @@ function render() {
     return;
   }
   colors = subjectColors(lectures);
+  conflicts = findConflicts(lectures);
   // أيام الدوام من السبت للخميس دايماً ظاهرة، والجمعة بس إذا فيها محاضرات
   const days = DAYS.filter((d) => d.key !== 'fri' || lectures.some((l) => l.day === 'fri'));
   const startHour = Math.floor(Math.min(...lectures.map((l) => toMinutes(l.from))) / 60);
@@ -98,8 +100,9 @@ function render() {
       .filter((l) => l.day === d.key)
       .map((l) => ({ l, start: toMinutes(l.from), end: toMinutes(l.to) })));
     const blocks = items.map(({ l, start, end, lane, lanes }) => `
-      <button type="button" class="lec" data-id="${l.id}" data-from="${start}" data-to="${end}"
+      <button type="button" class="lec${conflicts[l.id] ? ' has-clash' : ''}" data-id="${l.id}" data-from="${start}" data-to="${end}"
         style="--c:${colors[l.subject]};top:${pct(start)};height:${((end - start) / total) * 100}%;inset-inline-start:${(lane / lanes) * 100}%;width:${100 / lanes}%">
+        ${conflicts[l.id] ? '<span class="clash-dot" aria-label="في تعارض"></span>' : ''}
         <span class="lec-name">${escapeHtml(l.subject)}</span>
         <span class="lec-time">${clock(l.from)}<span class="lec-to"> – ${clock(l.to)}</span></span>
         ${l.room ? `<span class="lec-room">${escapeHtml(l.room)}</span>` : ''}
@@ -150,6 +153,12 @@ function computeStatus(now) {
   return null;
 }
 
+function zoomButton(subject, extraClass = '') {
+  const z = data.zoom[subject];
+  if (!z) return '';
+  return `<a class="btn btn-zoom ${extraClass}" href="${escapeHtml(z.url)}" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM17 10l4-2.5v9L17 14z"/></svg>افتح رابط الزوم</a>`;
+}
+
 function nowHtml(st) {
   const l = st.lecture;
   const subject = escapeHtml(l.subject);
@@ -158,13 +167,15 @@ function nowHtml(st) {
     return `
       <span class="now-label"><i class="pulse"></i>هلأ عندك</span>
       <strong class="now-title">${subject}</strong>
-      <span class="now-meta">بتخلص ${timeText(l.to)} · باقي ${durationText(st.left)}${place}</span>`;
+      <span class="now-meta">بتخلص ${timeText(l.to)} · باقي ${durationText(st.left)}${place}</span>
+      ${zoomButton(l.subject, 'now-zoom')}`;
   }
   if (st.type === 'next') {
     return `
       <span class="now-label">المحاضرة الجاية اليوم</span>
       <strong class="now-title">${subject}</strong>
-      <span class="now-meta">الساعة ${timeText(l.from)} · بعد ${durationText(st.wait)}${place}</span>`;
+      <span class="now-meta">الساعة ${timeText(l.from)} · بعد ${durationText(st.wait)}${place}</span>
+      ${zoomButton(l.subject, 'now-zoom')}`;
   }
   const when = st.offset === 1 ? 'بكرة' : `يوم ${dayName(l.day)}`;
   return `
@@ -216,10 +227,14 @@ function openDetails(id) {
     <span class="sheet-handle" aria-hidden="true"></span>
     <p class="sheet-tag" style="--c:${colors[l.subject]}"><i></i>محاضرة</p>
     <h2 id="details-title">${escapeHtml(l.subject)}</h2>
+    ${conflicts[l.id] ? `<p class="clash-note"><i class="clash-dot" aria-hidden="true"></i>${conflictHtml(conflicts[l.id])}</p>` : ''}
     <dl class="facts">
       ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}
     </dl>
-    <button class="btn btn-primary btn-block" type="button" data-action="close-details">تمام</button>`;
+    ${data.zoom[l.subject] ? `
+      ${zoomButton(l.subject, 'btn-block')}
+      <p class="zoom-when">${data.zoom[l.subject].updatedAt ? `آخر تحديث للرابط: ${timeAgo(data.zoom[l.subject].updatedAt)}` : ''}</p>` : ''}
+    <button class="btn btn-block" type="button" data-action="close-details">تمام</button>`;
   $('details').showModal();
 }
 

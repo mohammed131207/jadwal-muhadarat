@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=3">
+  <link rel="stylesheet" href="assets/style.css?v=5">
 </head>
 <body class="admin">
   <header class="hero hero-sm">
@@ -55,6 +55,12 @@
         </div>
 
         <div id="lecture-list"></div>
+
+        <details class="card tools" id="zoom-card" open>
+          <summary>روابط الزوم</summary>
+          <p class="tools-intro">حط رابط الزوم لكل مادة، والطالب بيلاقيه بتفاصيل المحاضرة. لتمسح رابط فضّي الخانة واحفظ.</p>
+          <div id="zoom-list"></div>
+        </details>
 
         <details class="card tools">
           <summary>إعدادات الجدول</summary>
@@ -184,7 +190,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="assets/common.js?v=3"></script>
-  <script src="assets/admin.js?v=3"></script>
+  <script src="assets/common.js?v=5"></script>
+  <script src="assets/admin.js?v=5"></script>
 </body>
 </html>

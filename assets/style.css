@@ -15,6 +15,9 @@
   --accent: #FBBF24;
   --now: #F43F5E;
   --danger: #DC2626;
+  --clash: #EF4444;
+  --clash-soft: #FEE2E2;
+  --clash-text: #B91C1C;
   --tint: 15%;
   --ink: 68%;
   --ink-base: #000;
@@ -42,6 +45,9 @@
     --hero-to: #5B21B6;
     --bar: #23205A;
     --danger: #F87171;
+    --clash: #F87171;
+    --clash-soft: rgb(239 68 68 / 0.16);
+    --clash-text: #FCA5A5;
     --tint: 26%;
     --ink: 30%;
     --ink-base: #fff;
@@ -346,6 +352,86 @@ main.wrap { margin-top: -48px; }
   .lec-name { font-size: 0.9rem; }
   .lec-time, .lec-room { font-size: 0.78rem; }
 }
+
+/* ---------- التعارض: نقطة حمرا وملاحظة ---------- */
+.clash-dot {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  background: var(--clash);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.lec .clash-dot {
+  position: absolute;
+  top: 5px;
+  inset-inline-end: 5px;
+}
+.lec.has-clash .lec-name { padding-inline-end: 10px; }
+button.clash-dot {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  margin-inline-start: 8px;
+  vertical-align: 1px;
+  cursor: pointer;
+}
+button.clash-dot::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+}
+
+.clash-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--clash-text);
+  background: var(--clash-soft);
+  border-radius: 10px;
+}
+.clash-note .clash-dot { box-shadow: none; }
+#details .clash-note { margin: -4px 0 12px; }
+
+/* ---------- روابط الزوم ---------- */
+.btn.btn-zoom {
+  gap: 8px;
+  color: #fff;
+  background: #2D8CFF;
+  border-color: #2D8CFF;
+}
+.btn.btn-zoom:hover { background: #2D8CFF; filter: brightness(1.08); }
+.now-zoom { justify-self: start; min-height: 40px; margin-top: 10px; }
+.zoom-when { margin: 6px 0 10px; font-size: 0.8rem; text-align: center; color: var(--muted); }
+.zoom-when:empty { display: none; }
+#details .btn-zoom { margin-top: 4px; }
+
+.tools-intro { margin: 10px 0 4px; font-size: 0.88rem; color: var(--muted); }
+.zoom-row { padding: 14px 0; }
+.zoom-row + .zoom-row { border-top: 1px solid var(--line-soft); }
+.zoom-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.zoom-dot { width: 10px; height: 10px; flex: none; background: var(--c); border-radius: 50%; }
+.zoom-input { display: flex; gap: 8px; }
+.zoom-input input { flex: 1; min-width: 0; min-height: 44px; text-align: left; }
+.zoom-input .btn { flex: none; min-height: 44px; }
+.zoom-meta { margin: 8px 0 0; font-size: 0.82rem; color: var(--muted); }
+.zoom-meta b { color: var(--text); font-weight: 600; }
+.zoom-meta.is-empty { opacity: 0.8; }
 
 /* ---------- التذييل ---------- */
 .foot {
@@ -738,7 +824,7 @@ details.extra summary {
 .toast {
   position: fixed;
   inset-inline: 16px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  top: calc(16px + env(safe-area-inset-top));
   z-index: 50;
   max-width: 440px;
   margin: 0 auto;
@@ -750,7 +836,7 @@ details.extra summary {
   border-radius: 14px;
   box-shadow: 0 12px 30px -10px rgb(0 0 0 / 0.5);
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(-8px);
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }

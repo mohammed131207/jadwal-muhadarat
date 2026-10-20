@@ -79,6 +79,26 @@ function sortLectures(a, b) {
   return DAY_ORDER[a.day] - DAY_ORDER[b.day] || toMinutes(a.from) - toMinutes(b.from);
 }
 
+/* المحاضرات المتداخلة بنفس اليوم: id ← المحاضرات اللي متعارضة معها */
+function findConflicts(lectures) {
+  const out = {};
+  lectures.forEach((a, i) => {
+    lectures.slice(i + 1).forEach((b) => {
+      if (a.day !== b.day) return;
+      if (toMinutes(a.from) < toMinutes(b.to) && toMinutes(b.from) < toMinutes(a.to)) {
+        (out[a.id] = out[a.id] || []).push(b);
+        (out[b.id] = out[b.id] || []).push(a);
+      }
+    });
+  });
+  return out;
+}
+
+function conflictHtml(others) {
+  const list = others.map((o) => `«${escapeHtml(o.subject)}» (${timeText(o.from)} – ${timeText(o.to)})`).join(' و');
+  return `في تعارض: متداخلة مع ${list}`;
+}
+
 function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -87,7 +107,7 @@ const TIME_RE = /^\d{2}:\d{2}$/;
 
 /* يرجّع نسخة نظيفة من البيانات. بيقبل كمان الشكل القديم اللي كان فيه دفعات */
 function normalizeData(raw) {
-  const out = { updatedAt: null, title: DEFAULT_TITLE, subtitle: '', lectures: [] };
+  const out = { updatedAt: null, title: DEFAULT_TITLE, subtitle: '', lectures: [], zoom: {} };
   if (!raw || typeof raw !== 'object') return out;
   out.updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : null;
 
@@ -116,7 +136,36 @@ function normalizeData(raw) {
       doctor: String(l.doctor || '').trim(),
     }))
     .sort(sortLectures);
+
+  // روابط الزوم لكل مادة: { اسم المادة: { url, updatedAt } }
+  if (raw.zoom && typeof raw.zoom === 'object') {
+    Object.entries(raw.zoom).forEach(([subject, z]) => {
+      if (z && isWebUrl(z.url)) out.zoom[subject] = { url: z.url.trim(), updatedAt: typeof z.updatedAt === 'string' ? z.updatedAt : null };
+    });
+  }
   return out;
+}
+
+function isWebUrl(u) {
+  return typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
+}
+
+/* "قبل ساعتين" وما شابه، لآخر تحديث رابط الزوم */
+function timeAgo(iso) {
+  const t = new Date(iso).getTime();
+  if (!iso || Number.isNaN(t)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (mins < 1) return 'هلأ';
+  if (mins < 60) return `قبل ${countWord(mins, 'دقيقة', 'دقيقتين', 'دقائق', 'دقيقة')}`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `قبل ${countWord(hours, 'ساعة', 'ساعتين', 'ساعات', 'ساعة')}`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `قبل ${countWord(days, 'يوم', 'يومين', 'أيام', 'يوم')}`;
+  return new Date(t).toLocaleDateString('ar-u-nu-latn', { dateStyle: 'medium' });
+}
+
+function exactTime(iso) {
+  return new Date(iso).toLocaleString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 }
 
 async function fetchPublished() {

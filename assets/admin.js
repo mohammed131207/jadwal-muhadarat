@@ -184,6 +184,7 @@ function commit() {
 /* ---------- العرض ---------- */
 function renderAll() {
   renderList();
+  renderZoom();
   renderPublishBar();
   renderTokenState();
 }
@@ -196,6 +197,7 @@ function renderList() {
     return;
   }
   const colors = subjectColors(lectures);
+  const conflicts = findConflicts(lectures);
   $('lecture-list').innerHTML = DAYS
     .map((d) => ({ day: d, items: lectures.filter((l) => l.day === d.key) }))
     .filter((g) => g.items.length)
@@ -208,8 +210,9 @@ function renderList() {
           <div class="lec-item" style="--c:${colors[l.subject]}">
             <span class="lec-bar" aria-hidden="true"></span>
             <div class="lec-info">
-              <strong>${escapeHtml(l.subject)}</strong>
+              <strong>${escapeHtml(l.subject)}${conflicts[l.id] ? `<button class="clash-dot" type="button" data-clash="${l.id}" aria-expanded="false" aria-label="في تعارض، اضغط للتفاصيل"></button>` : ''}</strong>
               <span>${timeText(l.from)} – ${timeText(l.to)}${meta ? ` · ${meta}` : ''}</span>
+              ${conflicts[l.id] ? `<p class="clash-note" id="clash-${l.id}" hidden>${conflictHtml(conflicts[l.id])}</p>` : ''}
             </div>
             <div class="lec-actions">
               <button class="btn btn-sm" type="button" data-edit="${l.id}">تعديل</button>
@@ -350,16 +353,25 @@ $('lec-form').addEventListener('submit', (e) => {
     room: $('f-room').value.trim(),
     doctor: $('f-doctor').value.trim(),
   };
+  // التعارض ما بيمنع الحفظ؛ بس بنبّه وبتطلع نقطة حمرا جنب المادة
   const clash = data.lectures.find((l) => l.id !== editingId && l.day === v.day
     && toMinutes(l.from) < end && start < toMinutes(l.to));
-  if (clash && !confirm(`هاد الموعد متعارض مع «${clash.subject}» (${timeText(clash.from)} – ${timeText(clash.to)}) يوم ${dayName(clash.day)}. بدك تحفظها برضو؟`)) return;
+  const clashNote = clash ? ` بس في تعارض مع «${clash.subject}».` : '';
 
   if (editingId) {
-    Object.assign(data.lectures.find((l) => l.id === editingId), v);
-    toast('انحفظ التعديل.');
+    const lecture = data.lectures.find((l) => l.id === editingId);
+    const oldSubject = lecture.subject;
+    Object.assign(lecture, v);
+    // إذا تغيّر اسم المادة، رابط الزوم بينتقل معها
+    if (oldSubject !== subject && data.zoom[oldSubject] && !data.zoom[subject]
+      && !data.lectures.some((l) => l.subject === oldSubject)) {
+      data.zoom[subject] = data.zoom[oldSubject];
+      delete data.zoom[oldSubject];
+    }
+    toast(`انحفظ التعديل.${clashNote}`, Boolean(clash));
   } else {
     data.lectures.push({ id: makeId(), ...v });
-    toast(`انضافت «${subject}».`);
+    toast(`انضافت «${subject}».${clashNote}`, Boolean(clash));
   }
   data.lectures.sort(sortLectures);
   lastDay = form.day;
@@ -382,6 +394,13 @@ $('lec-form').addEventListener('submit', (e) => {
 $('add-btn').addEventListener('click', () => openLectureForm());
 
 $('lecture-list').addEventListener('click', (e) => {
+  const dot = e.target.closest('[data-clash]');
+  if (dot) {
+    const note = $(`clash-${dot.dataset.clash}`);
+    note.hidden = !note.hidden;
+    dot.setAttribute('aria-expanded', String(!note.hidden));
+    return;
+  }
   const edit = e.target.closest('[data-edit]');
   if (edit) return openLectureForm(data.lectures.find((l) => l.id === edit.dataset.edit));
   const del = e.target.closest('[data-delete]');
@@ -391,6 +410,58 @@ $('lecture-list').addEventListener('click', (e) => {
   data.lectures = data.lectures.filter((l) => l.id !== lecture.id);
   commit();
   toast('انحذفت.');
+});
+
+/* ---------- روابط الزوم ---------- */
+let zoomSubjects = [];
+const zoomTyping = {}; // اللي انكتب وما انحفظ، حتى ما يضيع لو انعادت الرسمة
+
+function renderZoom() {
+  zoomSubjects = [...new Set(data.lectures.map((l) => l.subject))].sort((a, b) => a.localeCompare(b, 'ar'));
+  if (!zoomSubjects.length) {
+    $('zoom-list').innerHTML = '<p class="tools-intro">ضيف محاضرات أول، وبعدين بتحط روابطها هون.</p>';
+    return;
+  }
+  const colors = subjectColors(data.lectures);
+  $('zoom-list').innerHTML = zoomSubjects.map((subject, i) => {
+    const z = data.zoom[subject];
+    const value = zoomTyping[subject] ?? (z ? z.url : '');
+    const when = z && z.updatedAt
+      ? `آخر مرة انحط الرابط: <b>${timeAgo(z.updatedAt)}</b> · ${exactTime(z.updatedAt)}`
+      : 'ما انحط رابط لسا';
+    return `
+      <div class="zoom-row" style="--c:${colors[subject]}">
+        <label for="zoom-${i}"><i class="zoom-dot" aria-hidden="true"></i>${escapeHtml(subject)}</label>
+        <div class="zoom-input">
+          <input id="zoom-${i}" type="url" inputmode="url" dir="ltr" autocomplete="off" spellcheck="false"
+            placeholder="https://zoom.us/j/…" value="${escapeHtml(value)}" data-zoom-input="${i}">
+          <button class="btn btn-sm btn-primary" type="button" data-zoom-save="${i}">حفظ ونشر</button>
+        </div>
+        <p class="zoom-meta${z ? '' : ' is-empty'}">${when}</p>
+      </div>`;
+  }).join('');
+}
+
+$('zoom-list').addEventListener('input', (e) => {
+  const input = e.target.closest('[data-zoom-input]');
+  if (input) zoomTyping[zoomSubjects[input.dataset.zoomInput]] = input.value;
+});
+
+$('zoom-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-zoom-save]');
+  if (!btn) return;
+  const subject = zoomSubjects[btn.dataset.zoomSave];
+  const url = $(`zoom-${btn.dataset.zoomSave}`).value.trim();
+  if (url && !isWebUrl(url)) {
+    toast('الرابط لازم يبلش بـ https://', true);
+    return;
+  }
+  delete zoomTyping[subject];
+  if (url) data.zoom[subject] = { url, updatedAt: new Date().toISOString() };
+  else delete data.zoom[subject];
+  commit();
+  toast(url ? `انحفظ رابط «${subject}». جاري النشر…` : `انمسح رابط «${subject}». جاري النشر…`);
+  publish();
 });
 
 /* ---------- عنوان الجدول ---------- */
@@ -427,7 +498,7 @@ async function publish() {
       throw err;
     }
     if (!t) return openTokenDialog();
-    const payload = { updatedAt: new Date().toISOString(), title: data.title, subtitle: data.subtitle, lectures: data.lectures };
+    const payload = { updatedAt: new Date().toISOString(), title: data.title, subtitle: data.subtitle, lectures: data.lectures, zoom: data.zoom };
     await putFile(t, JSON.stringify(payload, null, 2) + '\n');
     data.updatedAt = payload.updatedAt;
     dirty = false;
@@ -512,7 +583,7 @@ document.querySelectorAll('dialog.sheet').forEach((d) => {
 
 /* ---------- نسخة احتياطية ---------- */
 $('export').addEventListener('click', () => {
-  const payload = { updatedAt: data.updatedAt, title: data.title, subtitle: data.subtitle, lectures: data.lectures };
+  const payload = { updatedAt: data.updatedAt, title: data.title, subtitle: data.subtitle, lectures: data.lectures, zoom: data.zoom };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

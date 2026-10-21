@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T21:19:13.483Z",
+  "updatedAt": "2026-10-21T19:34:02.431Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
@@ -85,15 +85,6 @@
       "doctor": ""
     },
     {
-      "id": "mvfqwfkqnpj76",
-      "day": "thu",
-      "from": "12:00",
-      "to": "14:00",
-      "subject": "مقدة في الذكاء الاصطناعي عملي",
-      "room": "",
-      "doctor": ""
-    },
-    {
       "id": "mvfr5ytlciu2d",
       "day": "thu",
       "from": "16:30",
@@ -102,5 +93,6 @@
       "room": "",
       "doctor": ""
     }
-  ]
+  ],
+  "zoom": {}
 }

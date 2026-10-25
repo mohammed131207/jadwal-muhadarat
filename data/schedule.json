@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-24T19:06:29.366Z",
+  "updatedAt": "2026-10-25T08:46:22.978Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
@@ -10,7 +10,9 @@
       "to": "11:30",
       "subject": "قواعد البيانات",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     },
     {
       "id": "mvfr6u3q9vrbv",
@@ -19,7 +21,9 @@
       "to": "14:00",
       "subject": "مهارات الاتصال والقيادة",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     },
     {
       "id": "mvl5org4jj5y5",
@@ -28,7 +32,9 @@
       "to": "17:30",
       "subject": "أخلاقيات هندسة البرمجيات",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "optional",
+      "note": ""
     },
     {
       "id": "mvfr7g5yyjuxt",
@@ -37,7 +43,9 @@
       "to": "11:00",
       "subject": "دراسات فلسطينية",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "optional",
+      "note": ""
     },
     {
       "id": "mvfr6drvqe36a",
@@ -46,7 +54,9 @@
       "to": "13:00",
       "subject": "الكترونيات",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "",
+      "note": ""
     },
     {
       "id": "mvfrbkrdg96qr",
@@ -55,7 +65,9 @@
       "to": "11:00",
       "subject": "قواعد البيانات",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     },
     {
       "id": "mvfkmvjopgoup",
@@ -64,7 +76,9 @@
       "to": "12:00",
       "subject": "دراسات فلسطينة",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "optional",
+      "note": ""
     },
     {
       "id": "mvflepz3rrzf5",
@@ -73,7 +87,9 @@
       "to": "13:00",
       "subject": "مقدمه في الذكاء الاصطناعي نظري",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     },
     {
       "id": "mvfr1u1k9rh0v",
@@ -82,7 +98,9 @@
       "to": "14:00",
       "subject": "هياكل البيانات نظري",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     },
     {
       "id": "mvfr3hh0e4mtw",
@@ -91,7 +109,9 @@
       "to": "14:00",
       "subject": "هياكل بيانات عملي",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     },
     {
       "id": "mvfr5691ogsfh",
@@ -100,8 +120,11 @@
       "to": "12:00",
       "subject": "الامن السيبراني عملي ونظري",
       "room": "",
-      "doctor": ""
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     }
   ],
+  "quizzes": [],
   "zoom": {}
 }

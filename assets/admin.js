@@ -184,9 +184,15 @@ function commit() {
 /* ---------- العرض ---------- */
 function renderAll() {
   renderList();
+  renderQuizzes();
   renderZoom();
   renderPublishBar();
   renderTokenState();
+}
+
+function attendanceTag(value) {
+  if (!value) return '';
+  return `<span class="att-tag att-${value}">حضور ${ATTENDANCE[value]}</span>`;
 }
 
 function renderList() {
@@ -212,6 +218,7 @@ function renderList() {
             <div class="lec-info">
               <strong>${escapeHtml(l.subject)}${conflicts[l.id] ? `<button class="clash-dot" type="button" data-clash="${l.id}" aria-expanded="false" aria-label="في تعارض، اضغط للتفاصيل"></button>` : ''}</strong>
               <span>${timeText(l.from)} – ${timeText(l.to)}${meta ? ` · ${meta}` : ''}</span>
+              ${l.attendance || l.note ? `<span class="lec-extra">${attendanceTag(l.attendance)}${l.note ? `<span class="lec-note">${escapeHtml(l.note)}</span>` : ''}</span>` : ''}
               ${conflicts[l.id] ? `<p class="clash-note" id="clash-${l.id}" hidden>${conflictHtml(conflicts[l.id])}</p>` : ''}
             </div>
             <div class="lec-actions">
@@ -221,6 +228,42 @@ function renderList() {
           </div>`;
         }).join('')}
       </section>`).join('');
+}
+
+function renderQuizzes() {
+  const quizzes = data.quizzes;
+  const upcoming = quizzes.filter((q) => !quizEnded(q));
+  $('quiz-title').textContent = upcoming.length ? `الكويزات (${upcoming.length} جاية)` : 'الكويزات';
+  if (!quizzes.length) {
+    $('quiz-list').innerHTML = '<div class="card state"><p>ما في كويزات. لما يكون في كويز اضغط «إضافة كويز».</p></div>';
+    return;
+  }
+  const row = (q) => {
+    const ended = quizEnded(q);
+    return `
+      <div class="lec-item quiz-item${ended ? ' is-ended' : ''}">
+        <span class="lec-bar" aria-hidden="true"></span>
+        <div class="lec-info">
+          <strong>${escapeHtml(q.subject)}</strong>
+          <span>${longDate(q.date)} · ${timeText(q.from)} – ${timeText(q.to)}</span>
+          <span class="lec-extra"><span class="quiz-when">${ended ? 'خلص' : daysUntilText(q.date)}</span>${q.note ? `<span class="lec-note">${escapeHtml(q.note)}</span>` : ''}</span>
+        </div>
+        <div class="lec-actions">
+          <button class="btn btn-sm" type="button" data-edit-quiz="${q.id}">تعديل</button>
+          <button class="btn btn-sm btn-danger" type="button" data-delete-quiz="${q.id}">حذف</button>
+        </div>
+      </div>`;
+  };
+  const ended = quizzes.filter((q) => quizEnded(q));
+  $('quiz-list').innerHTML = `
+    <section class="card day-group">
+      ${upcoming.length ? upcoming.map(row).join('') : '<p class="tools-intro">ما في كويزات جاية.</p>'}
+      ${ended.length ? `
+        <details class="ended-quizzes">
+          <summary>كويزات خلصت (${ended.length})</summary>
+          ${ended.slice().reverse().map(row).join('')}
+        </details>` : ''}
+    </section>`;
 }
 
 function renderPublishBar() {
@@ -239,13 +282,16 @@ function renderTokenState() {
   $('token-change').textContent = linked ? 'تغيير توكن GitHub' : 'ربط GitHub';
 }
 
-/* ---------- نموذج المحاضرة (أزرار بدل خانات الوقت) ---------- */
+/* ---------- نموذج المحاضرة والكويز (أزرار بدل خانات الوقت) ---------- */
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 ص لـ 8 م
 const MINUTES = [0, 15, 30, 45];
-const DURATIONS = [60, 90, 120, 150, 180];
-const form = { day: 'sat', hour: null, minute: 0, duration: 60 };
+const DURATIONS = [30, 60, 90, 120, 150, 180];
+const ATTENDANCE_CHOICES = [['required', 'إجباري'], ['optional', 'مش إجباري'], ['', 'مش محدد']];
+// mode: lecture أو quiz. الكويز بتاريخ محدد بدل يوم بالأسبوع
+const form = { mode: 'lecture', day: 'sat', date: null, hour: null, minute: 0, duration: 60, attendance: '' };
 let lastDay = 'sat';
 let lastDuration = 60;
+let timeTouched = false;
 
 function hourLabel(h) {
   return `${h % 12 || 12} ${h < 12 ? 'ص' : 'م'}`;
@@ -255,8 +301,27 @@ function chip(group, value, label, active) {
   return `<button type="button" class="chip${active ? ' is-on' : ''}" role="radio" aria-checked="${active}" data-group="${group}" data-value="${value}">${label}</button>`;
 }
 
+function dateChoices() {
+  const today = new Date();
+  const dates = Array.from({ length: 28 }, (_, i) => dateKey(addDays(today, i)));
+  if (form.date && !dates.includes(form.date)) dates.unshift(form.date);
+  return dates;
+}
+
+function dateChipLabel(key) {
+  const n = daysUntil(key);
+  const top = n === 0 ? 'اليوم' : n === 1 ? 'بكرة' : DAYS.find((d) => d.key === dayKeyOf(key)).name;
+  return `<span class="date-top">${top}</span><span class="date-num">${shortDate(key)}</span>`;
+}
+
 function renderChips() {
-  $('day-chips').innerHTML = DAYS.map((d) => chip('day', d.key, d.name, form.day === d.key)).join('');
+  const quiz = form.mode === 'quiz';
+  if (quiz) {
+    $('date-chips').innerHTML = dateChoices().map((k) => chip('date', k, dateChipLabel(k), form.date === k)).join('');
+  } else {
+    $('day-chips').innerHTML = DAYS.map((d) => chip('day', d.key, d.name, form.day === d.key)).join('');
+    $('attendance-chips').innerHTML = ATTENDANCE_CHOICES.map(([v, label]) => chip('attendance', v, label, form.attendance === v)).join('');
+  }
 
   const hours = form.hour !== null && !HOURS.includes(form.hour) ? [...HOURS, form.hour].sort((a, b) => a - b) : HOURS;
   $('hour-chips').innerHTML = hours.map((h) => chip('hour', h, hourLabel(h), form.hour === h)).join('');
@@ -264,13 +329,14 @@ function renderChips() {
   const minutes = MINUTES.includes(form.minute) ? MINUTES : [...MINUTES, form.minute].sort((a, b) => a - b);
   $('minute-chips').innerHTML = minutes.map((m) => chip('minute', m, `<span class="ltr">:${String(m).padStart(2, '0')}</span>`, form.minute === m)).join('');
 
-  $('duration-chips').innerHTML = DURATIONS.map((d) => chip('duration', d, durationText(d), form.duration === d)).join('');
+  $('duration-chips').innerHTML = DURATIONS.map((d) => chip('duration', d, d === 30 ? 'نص ساعة' : durationText(d), form.duration === d)).join('');
   $('duration-text').textContent = durationText(form.duration);
 
   const start = form.hour === null ? null : form.hour * 60 + form.minute;
-  $('summary').innerHTML = start === null
-    ? 'اختار الساعة اللي بتبلش فيها المحاضرة'
-    : `<b>${dayName(form.day)}</b> · من ${timeText(start)} لـ ${timeText(start + form.duration)}`;
+  const where = quiz ? (form.date ? `كويز · ${longDate(form.date)}` : '') : dayName(form.day);
+  if (quiz && !form.date) $('summary').innerHTML = 'اختار تاريخ الكويز';
+  else if (start === null) $('summary').innerHTML = quiz ? 'اختار الساعة اللي بيبلش فيها الكويز' : 'اختار الساعة اللي بتبلش فيها المحاضرة';
+  else $('summary').innerHTML = `<b>${where}</b> · من ${timeText(start)} لـ ${timeText(start + form.duration)}`;
 }
 
 function renderSubjectChips() {
@@ -280,24 +346,47 @@ function renderSubjectChips() {
   $('subject-chips').innerHTML = names.map((n) => `<button type="button" class="chip chip-soft${n === typed ? ' is-on' : ''}" data-subject="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('');
 }
 
-function openLectureForm(lecture = null) {
-  editingId = lecture ? lecture.id : null;
-  $('lec-title').textContent = lecture ? 'تعديل محاضرة' : 'إضافة محاضرة';
-  $('save-again-btn').hidden = Boolean(lecture);
+/* الكويز غالباً بوقت المحاضرة: إذا في محاضرة لنفس المادة بنفس اليوم، بنعبّي وقتها */
+function prefillQuizTime() {
+  if (form.mode !== 'quiz' || timeTouched || !form.date) return;
+  const subject = $('f-subject').value.trim();
+  const lecture = data.lectures.find((l) => l.subject === subject && l.day === dayKeyOf(form.date));
+  if (!lecture) return;
+  const start = toMinutes(lecture.from);
+  Object.assign(form, { hour: Math.floor(start / 60), minute: start % 60, duration: toMinutes(lecture.to) - start });
+}
+
+function openForm(mode, item = null) {
+  const quiz = mode === 'quiz';
+  editingId = item ? item.id : null;
+  timeTouched = Boolean(item);
+  form.mode = mode;
+  $('lec-title').textContent = item ? (quiz ? 'تعديل كويز' : 'تعديل محاضرة') : (quiz ? 'إضافة كويز' : 'إضافة محاضرة');
+  $('day-field').hidden = quiz;
+  $('date-field').hidden = !quiz;
+  $('attendance-field').hidden = quiz;
+  $('place-row').hidden = quiz;
+  $('extra-title').textContent = quiz ? 'ملاحظة (اختياري)' : 'ملاحظة والقاعة والمحاضر (اختياري)';
+  $('f-note').placeholder = quiz ? 'مثلاً: من محاضرة 1 لـ 4' : 'مثلاً: جيب اللابتوب معك';
+  $('save-again-btn').hidden = Boolean(item) || quiz;
   $('form-error').textContent = '';
-  if (lecture) {
-    const start = toMinutes(lecture.from);
-    Object.assign(form, { day: lecture.day, hour: Math.floor(start / 60), minute: start % 60, duration: toMinutes(lecture.to) - start });
-    $('f-subject').value = lecture.subject;
-    $('f-room').value = lecture.room;
-    $('f-doctor').value = lecture.doctor;
+
+  if (item) {
+    const start = toMinutes(item.from);
+    Object.assign(form, { hour: Math.floor(start / 60), minute: start % 60, duration: toMinutes(item.to) - start });
+    if (quiz) form.date = item.date;
+    else Object.assign(form, { day: item.day, attendance: item.attendance });
+    $('f-subject').value = item.subject;
+    $('f-note').value = item.note;
+    $('f-room').value = item.room || '';
+    $('f-doctor').value = item.doctor || '';
   } else {
-    Object.assign(form, { day: lastDay, hour: null, minute: 0, duration: lastDuration });
-    $('f-subject').value = '';
-    $('f-room').value = '';
-    $('f-doctor').value = '';
+    Object.assign(form, { hour: null, minute: 0 });
+    if (quiz) Object.assign(form, { date: null, duration: 30 });
+    else Object.assign(form, { day: lastDay, duration: lastDuration, attendance: '' });
+    ['f-subject', 'f-note', 'f-room', 'f-doctor'].forEach((id) => { $(id).value = ''; });
   }
-  $('extra').open = Boolean(lecture && (lecture.room || lecture.doctor));
+  $('extra').open = Boolean(item && (item.note || item.room || item.doctor));
   renderChips();
   renderSubjectChips();
   if (!$('lec-dialog').open) $('lec-dialog').showModal();
@@ -307,9 +396,12 @@ function openLectureForm(lecture = null) {
 $('lec-form').addEventListener('click', (e) => {
   const c = e.target.closest('[data-group]');
   if (c) {
+    const group = c.dataset.group;
     const v = c.dataset.value;
-    if (c.dataset.group === 'day') form.day = v;
-    else form[c.dataset.group] = Number(v);
+    if (group === 'day' || group === 'date' || group === 'attendance') form[group] = v;
+    else form[group] = Number(v);
+    if (group === 'hour' || group === 'minute' || group === 'duration') timeTouched = true;
+    if (group === 'date') prefillQuizTime();
     $('form-error').textContent = '';
     renderChips();
     return;
@@ -318,11 +410,14 @@ $('lec-form').addEventListener('click', (e) => {
   if (s) {
     $('f-subject').value = s.dataset.subject;
     renderSubjectChips();
+    prefillQuizTime();
+    renderChips();
     return;
   }
   const step = e.target.closest('[data-step]');
   if (step) {
     form.duration = Math.min(360, Math.max(15, form.duration + Number(step.dataset.step)));
+    timeTouched = true;
     renderChips();
     return;
   }
@@ -336,14 +431,28 @@ $('f-subject').addEventListener('input', () => {
 
 $('lec-form').addEventListener('submit', (e) => {
   e.preventDefault();
+  const quiz = form.mode === 'quiz';
   const again = e.submitter && e.submitter.value === 'again';
   const fail = (msg) => { $('form-error').textContent = msg; };
   const subject = $('f-subject').value.trim();
   if (!subject) return fail('اكتب اسم المادة.');
-  if (form.hour === null) return fail('اختار الساعة اللي بتبلش فيها المحاضرة.');
+  if (quiz && !form.date) return fail('اختار تاريخ الكويز.');
+  if (form.hour === null) return fail(quiz ? 'اختار الساعة اللي بيبلش فيها الكويز.' : 'اختار الساعة اللي بتبلش فيها المحاضرة.');
   const start = form.hour * 60 + form.minute;
   const end = start + form.duration;
-  if (end > 24 * 60) return fail('المحاضرة بتعدّي نص الليل. قصّر المدة.');
+  if (end > 24 * 60) return fail('الوقت بيعدّي نص الليل. قصّر المدة.');
+  const note = $('f-note').value.trim();
+
+  if (quiz) {
+    const v = { date: form.date, from: fromMinutes(start), to: fromMinutes(end), subject, note };
+    if (editingId) Object.assign(data.quizzes.find((q) => q.id === editingId), v);
+    else data.quizzes.push({ id: makeId(), ...v });
+    data.quizzes.sort(sortQuizzes);
+    toast(editingId ? 'انحفظ تعديل الكويز.' : `انضاف كويز «${subject}» ${daysUntilText(form.date)}.`);
+    commit();
+    $('lec-dialog').close();
+    return;
+  }
 
   const v = {
     day: form.day,
@@ -352,6 +461,8 @@ $('lec-form').addEventListener('submit', (e) => {
     subject,
     room: $('f-room').value.trim(),
     doctor: $('f-doctor').value.trim(),
+    attendance: form.attendance,
+    note,
   };
   // التعارض ما بيمنع الحفظ؛ بس بنبّه وبتطلع نقطة حمرا جنب المادة
   const clash = data.lectures.find((l) => l.id !== editingId && l.day === v.day
@@ -380,7 +491,7 @@ $('lec-form').addEventListener('submit', (e) => {
 
   if (again) {
     // المحاضرة الجاية: نفس اليوم، بتبلش لما تخلص هاي وبنفس المدة
-    openLectureForm();
+    openForm('lecture');
     if (end + form.duration <= 24 * 60) {
       form.hour = Math.floor(end / 60);
       form.minute = end % 60;
@@ -391,7 +502,8 @@ $('lec-form').addEventListener('submit', (e) => {
   }
 });
 
-$('add-btn').addEventListener('click', () => openLectureForm());
+$('add-btn').addEventListener('click', () => openForm('lecture'));
+$('add-quiz-btn').addEventListener('click', () => openForm('quiz'));
 
 $('lecture-list').addEventListener('click', (e) => {
   const dot = e.target.closest('[data-clash]');
@@ -402,7 +514,7 @@ $('lecture-list').addEventListener('click', (e) => {
     return;
   }
   const edit = e.target.closest('[data-edit]');
-  if (edit) return openLectureForm(data.lectures.find((l) => l.id === edit.dataset.edit));
+  if (edit) return openForm('lecture', data.lectures.find((l) => l.id === edit.dataset.edit));
   const del = e.target.closest('[data-delete]');
   if (!del) return;
   const lecture = data.lectures.find((l) => l.id === del.dataset.delete);
@@ -410,6 +522,18 @@ $('lecture-list').addEventListener('click', (e) => {
   data.lectures = data.lectures.filter((l) => l.id !== lecture.id);
   commit();
   toast('انحذفت.');
+});
+
+$('quiz-list').addEventListener('click', (e) => {
+  const edit = e.target.closest('[data-edit-quiz]');
+  if (edit) return openForm('quiz', data.quizzes.find((q) => q.id === edit.dataset.editQuiz));
+  const del = e.target.closest('[data-delete-quiz]');
+  if (!del) return;
+  const quiz = data.quizzes.find((q) => q.id === del.dataset.deleteQuiz);
+  if (!quiz || !confirm(`تحذف كويز «${quiz.subject}» ${longDate(quiz.date)}؟`)) return;
+  data.quizzes = data.quizzes.filter((q) => q.id !== quiz.id);
+  commit();
+  toast('انحذف الكويز.');
 });
 
 /* ---------- روابط الزوم ---------- */
@@ -498,7 +622,7 @@ async function publish() {
       throw err;
     }
     if (!t) return openTokenDialog();
-    const payload = { updatedAt: new Date().toISOString(), title: data.title, subtitle: data.subtitle, lectures: data.lectures, zoom: data.zoom };
+    const payload = { updatedAt: new Date().toISOString(), title: data.title, subtitle: data.subtitle, lectures: data.lectures, quizzes: data.quizzes, zoom: data.zoom };
     await putFile(t, JSON.stringify(payload, null, 2) + '\n');
     data.updatedAt = payload.updatedAt;
     dirty = false;
@@ -583,7 +707,7 @@ document.querySelectorAll('dialog.sheet').forEach((d) => {
 
 /* ---------- نسخة احتياطية ---------- */
 $('export').addEventListener('click', () => {
-  const payload = { updatedAt: data.updatedAt, title: data.title, subtitle: data.subtitle, lectures: data.lectures, zoom: data.zoom };
+  const payload = { updatedAt: data.updatedAt, title: data.title, subtitle: data.subtitle, lectures: data.lectures, quizzes: data.quizzes, zoom: data.zoom };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

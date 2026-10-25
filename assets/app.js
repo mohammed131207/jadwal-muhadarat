@@ -69,19 +69,47 @@ function layoutDay(items) {
   return out;
 }
 
+const QUIZ_COLOR = '#F59E0B';
+let weekDates = {};   // يوم الأسبوع ← تاريخه بهالأسبوع
+let renderedWeek = '';
+let lectureQuiz = {}; // محاضرة ← كويز بهالأسبوع بنفس وقتها
+
 function render() {
   const lectures = data.lectures;
-  if (!lectures.length) {
+  const now = new Date();
+  const ws = weekStart(now);
+  renderedWeek = dateKey(ws);
+  weekDates = Object.fromEntries(DAYS.map((d, i) => [d.key, dateKey(addDays(ws, i))]));
+  colors = subjectColors([...lectures, ...data.quizzes]);
+  conflicts = findConflicts(lectures);
+  renderUpcomingQuizzes(now);
+
+  // كويزات هالأسبوع: إذا وقتها جوّا محاضرة لنفس المادة بتطلع علامة عليها، وإلا بتطلع لحالها بالجدول
+  const thisWeek = Object.values(weekDates);
+  lectureQuiz = {};
+  const loose = [];
+  data.quizzes.filter((q) => thisWeek.includes(q.date)).forEach((q) => {
+    const day = dayKeyOf(q.date);
+    const host = lectures.find((l) => l.day === day && l.subject === q.subject
+      && toMinutes(l.from) < toMinutes(q.to) && toMinutes(q.from) < toMinutes(l.to));
+    if (host && !lectureQuiz[host.id]) lectureQuiz[host.id] = q;
+    else loose.push({ ...q, day });
+  });
+
+  const items = [
+    ...lectures.map((l) => ({ kind: 'lec', l })),
+    ...loose.map((q) => ({ kind: 'quiz', l: q })),
+  ];
+  if (!items.length) {
     app.innerHTML = '<p class="state">لسا ما انضافت محاضرات للجدول.</p>';
     $('now').hidden = true;
     return;
   }
-  colors = subjectColors(lectures);
-  conflicts = findConflicts(lectures);
-  // أيام الدوام من السبت للخميس دايماً ظاهرة، والجمعة بس إذا فيها محاضرات
-  const days = DAYS.filter((d) => d.key !== 'fri' || lectures.some((l) => l.day === 'fri'));
-  const startHour = Math.floor(Math.min(...lectures.map((l) => toMinutes(l.from))) / 60);
-  let endHour = Math.ceil(Math.max(...lectures.map((l) => toMinutes(l.to))) / 60);
+
+  // أيام الدوام من السبت للخميس دايماً ظاهرة، والجمعة بس إذا فيها شي
+  const days = DAYS.filter((d) => d.key !== 'fri' || items.some((it) => it.l.day === 'fri'));
+  const startHour = Math.floor(Math.min(...items.map((it) => toMinutes(it.l.from))) / 60);
+  let endHour = Math.ceil(Math.max(...items.map((it) => toMinutes(it.l.to))) / 60);
   if (endHour - startHour < 4) endHour = Math.min(24, startHour + 4);
   const hours = endHour - startHour;
   const rangeStart = startHour * 60;
@@ -91,23 +119,39 @@ function render() {
   const head = days.map((d) => `
     <div class="day-head" data-day="${d.key}">
       <span class="full">${d.name}</span><span class="short">${d.short}</span>
+      <span class="day-date">${shortDate(weekDates[d.key])}</span>
     </div>`).join('');
 
   const axis = Array.from({ length: hours }, (_, i) => `<span style="top:${(i / hours) * 100}%">${hourLabel(startHour + i)}</span>`).join('');
 
-  const cols = days.map((d) => {
-    const items = layoutDay(lectures
-      .filter((l) => l.day === d.key)
-      .map((l) => ({ l, start: toMinutes(l.from), end: toMinutes(l.to) })));
-    const blocks = items.map(({ l, start, end, lane, lanes }) => `
-      <button type="button" class="lec${conflicts[l.id] ? ' has-clash' : ''}" data-id="${l.id}" data-from="${start}" data-to="${end}"
-        style="--c:${colors[l.subject]};top:${pct(start)};height:${((end - start) / total) * 100}%;inset-inline-start:${(lane / lanes) * 100}%;width:${100 / lanes}%">
+  const block = ({ kind, l, start, end, lane, lanes }) => {
+    const pos = `top:${pct(start)};height:${((end - start) / total) * 100}%;inset-inline-start:${(lane / lanes) * 100}%;width:${100 / lanes}%`;
+    const time = `<span class="lec-time">${clock(l.from)}<span class="lec-to"> – ${clock(l.to)}</span></span>`;
+    if (kind === 'quiz') {
+      return `
+      <button type="button" class="lec is-quiz" data-quiz="${l.id}" data-from="${start}" data-to="${end}" style="--c:${QUIZ_COLOR};${pos}">
+        <span class="lec-name"><span class="quiz-badge">كويز</span> ${escapeHtml(l.subject)}</span>
+        ${time}
+      </button>`;
+    }
+    const classes = ['lec', conflicts[l.id] && 'has-clash', lectureQuiz[l.id] && 'has-quiz'].filter(Boolean).join(' ');
+    return `
+      <button type="button" class="${classes}" data-id="${l.id}" data-from="${start}" data-to="${end}" style="--c:${colors[l.subject]};${pos}">
         ${conflicts[l.id] ? '<span class="clash-dot" aria-label="في تعارض"></span>' : ''}
         <span class="lec-name">${escapeHtml(l.subject)}</span>
-        <span class="lec-time">${clock(l.from)}<span class="lec-to"> – ${clock(l.to)}</span></span>
+        ${lectureQuiz[l.id]
+          ? `<span class="lec-time">${clock(l.from)} <span class="quiz-badge">كويز</span></span>`
+          : time}
         ${l.room ? `<span class="lec-room">${escapeHtml(l.room)}</span>` : ''}
-      </button>`).join('');
-    return `<div class="day-col" data-day="${d.key}">${blocks}<div class="now-line" hidden></div></div>`;
+      </button>`;
+  };
+
+  const cols = days.map((d) => {
+    const dayItems = layoutDay(items
+      .filter((it) => it.l.day === d.key)
+      .map((it) => ({ ...it, start: toMinutes(it.l.from), end: toMinutes(it.l.to) }))
+      .sort((a, b) => a.start - b.start));
+    return `<div class="day-col" data-day="${d.key}">${dayItems.map(block).join('')}<div class="now-line" hidden></div></div>`;
   }).join('');
 
   app.innerHTML = `
@@ -120,6 +164,24 @@ function render() {
     <p class="board-hint">اضغط على أي محاضرة لتشوف تفاصيلها</p>`;
   updateLive();
   scrollToToday();
+}
+
+function renderUpcomingQuizzes(now) {
+  const upcoming = data.quizzes.filter((q) => !quizEnded(q, now)).slice(0, 6);
+  const el = $('quizzes');
+  el.hidden = !upcoming.length;
+  if (!upcoming.length) return;
+  el.innerHTML = `
+    <h2 class="quiz-card-title">الكويزات الجاية</h2>
+    ${upcoming.map((q) => {
+      const n = daysUntil(q.date, now);
+      return `
+      <button type="button" class="quiz-row${n <= 1 ? ' is-soon' : ''}" data-quiz="${q.id}">
+        <span class="quiz-date"><b>${DAYS.find((d) => d.key === dayKeyOf(q.date)).name}</b><small>${shortDate(q.date)}</small></span>
+        <span class="quiz-info"><strong>${escapeHtml(q.subject)}</strong><span>الساعة ${timeText(q.from)}${q.note ? ` · ${escapeHtml(q.note)}` : ''}</span></span>
+        <span class="quiz-when">${daysUntilText(q.date, now)}</span>
+      </button>`;
+    }).join('')}`;
 }
 
 /* على الجوال الجدول بينسحب لجنب؛ نخلّي عمود اليوم أول عمود جنب الساعات */
@@ -159,40 +221,53 @@ function zoomButton(subject, extraClass = '') {
   return `<a class="btn btn-zoom ${extraClass}" href="${escapeHtml(z.url)}" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM17 10l4-2.5v9L17 14z"/></svg>افتح رابط الزوم</a>`;
 }
 
-function nowHtml(st) {
+/* الكويز الجاي لمادة معيّنة (بأي أسبوع) */
+function nextQuizFor(subject, now = new Date()) {
+  return data.quizzes.find((q) => q.subject === subject && !quizEnded(q, now));
+}
+
+function nowHtml(st, now) {
   const l = st.lecture;
   const subject = escapeHtml(l.subject);
   const place = l.room ? ` · ${escapeHtml(l.room)}` : '';
+  const att = l.attendance === 'required' ? ' · الحضور إجباري' : '';
+  const quiz = nextQuizFor(l.subject, now);
+  const quizToday = quiz && quiz.date === dateKey(now) && st.type !== 'done' && st.type !== 'free'
+    ? '<span class="now-quiz">فيها كويز</span>' : '';
   if (st.type === 'now') {
     return `
       <span class="now-label"><i class="pulse"></i>هلأ عندك</span>
-      <strong class="now-title">${subject}</strong>
-      <span class="now-meta">بتخلص ${timeText(l.to)} · باقي ${durationText(st.left)}${place}</span>
+      <strong class="now-title">${subject}${quizToday}</strong>
+      <span class="now-meta">بتخلص ${timeText(l.to)} · باقي ${durationText(st.left)}${place}${att}</span>
       ${zoomButton(l.subject, 'now-zoom')}`;
   }
   if (st.type === 'next') {
     return `
       <span class="now-label">المحاضرة الجاية اليوم</span>
-      <strong class="now-title">${subject}</strong>
-      <span class="now-meta">الساعة ${timeText(l.from)} · بعد ${durationText(st.wait)}${place}</span>
+      <strong class="now-title">${subject}${quizToday}</strong>
+      <span class="now-meta">الساعة ${timeText(l.from)} · بعد ${durationText(st.wait)}${place}${att}</span>
       ${zoomButton(l.subject, 'now-zoom')}`;
   }
   const when = st.offset === 1 ? 'بكرة' : `يوم ${dayName(l.day)}`;
   return `
     <span class="now-label">${st.type === 'done' ? 'خلصت محاضرات اليوم' : 'ما في محاضرات اليوم'} · الجاية</span>
     <strong class="now-title">${subject}</strong>
-    <span class="now-meta">${when} الساعة ${timeText(l.from)}${place}</span>`;
+    <span class="now-meta">${when} الساعة ${timeText(l.from)}${place}${att}</span>`;
 }
 
 function updateLive() {
-  if (!data || !data.lectures.length) return;
+  if (!data) return;
   const now = new Date();
+  // بلش أسبوع جديد والصفحة مفتوحة: نعيد الرسم بتواريخ الأسبوع الجديد
+  if (renderedWeek && dateKey(weekStart(now)) !== renderedWeek) return render();
+  renderUpcomingQuizzes(now);
+  if (!data.lectures.length) return;
   const tk = todayKey(now);
   const mins = now.getHours() * 60 + now.getMinutes();
 
   const st = computeStatus(now);
   $('now').hidden = !st;
-  if (st) $('now').innerHTML = nowHtml(st);
+  if (st) $('now').innerHTML = nowHtml(st, now);
 
   const board = app.querySelector('.board');
   if (!board) return;
@@ -212,34 +287,65 @@ function updateLive() {
   });
 }
 
+function factsHtml(facts) {
+  return `<dl class="facts">${facts.filter(Boolean).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+}
+
+function zoomHtml(subject) {
+  const z = data.zoom[subject];
+  if (!z) return '';
+  return `${zoomButton(subject, 'btn-block')}
+    <p class="zoom-when">${z.updatedAt ? `آخر تحديث للرابط: ${timeAgo(z.updatedAt)}` : ''}</p>`;
+}
+
 function openDetails(id) {
   const l = data.lectures.find((x) => x.id === id);
   if (!l) return;
-  const minutes = toMinutes(l.to) - toMinutes(l.from);
-  const facts = [
-    ['اليوم', dayName(l.day)],
-    ['الوقت', `${timeText(l.from)} – ${timeText(l.to)}`],
-    ['المدة', durationText(minutes)],
-    l.room && ['القاعة', escapeHtml(l.room)],
-    l.doctor && ['المحاضر', escapeHtml(l.doctor)],
-  ].filter(Boolean);
+  const quiz = nextQuizFor(l.subject);
   $('details-body').innerHTML = `
     <span class="sheet-handle" aria-hidden="true"></span>
     <p class="sheet-tag" style="--c:${colors[l.subject]}"><i></i>محاضرة</p>
     <h2 id="details-title">${escapeHtml(l.subject)}</h2>
     ${conflicts[l.id] ? `<p class="clash-note"><i class="clash-dot" aria-hidden="true"></i>${conflictHtml(conflicts[l.id])}</p>` : ''}
-    <dl class="facts">
-      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}
-    </dl>
-    ${data.zoom[l.subject] ? `
-      ${zoomButton(l.subject, 'btn-block')}
-      <p class="zoom-when">${data.zoom[l.subject].updatedAt ? `آخر تحديث للرابط: ${timeAgo(data.zoom[l.subject].updatedAt)}` : ''}</p>` : ''}
+    ${quiz ? `<p class="quiz-note"><b>كويز ${daysUntilText(quiz.date)}</b> · ${longDate(quiz.date)} الساعة ${timeText(quiz.from)}${quiz.note ? ` · ${escapeHtml(quiz.note)}` : ''}</p>` : ''}
+    ${factsHtml([
+      ['اليوم', dayName(l.day)],
+      ['الوقت', `${timeText(l.from)} – ${timeText(l.to)}`],
+      ['المدة', durationText(toMinutes(l.to) - toMinutes(l.from))],
+      l.attendance && ['الحضور', `<span class="att-tag att-${l.attendance}">${ATTENDANCE[l.attendance]}</span>`],
+      l.room && ['القاعة', escapeHtml(l.room)],
+      l.doctor && ['المحاضر', escapeHtml(l.doctor)],
+      l.note && ['ملاحظة', escapeHtml(l.note)],
+    ])}
+    ${zoomHtml(l.subject)}
     <button class="btn btn-block" type="button" data-action="close-details">تمام</button>`;
   $('details').showModal();
 }
 
-app.addEventListener('click', (e) => {
-  const lec = e.target.closest('.lec');
+function openQuizDetails(id) {
+  const q = data.quizzes.find((x) => x.id === id);
+  if (!q) return;
+  const ended = quizEnded(q);
+  $('details-body').innerHTML = `
+    <span class="sheet-handle" aria-hidden="true"></span>
+    <p class="sheet-tag" style="--c:${QUIZ_COLOR}"><i></i>كويز ${ended ? '· خلص' : daysUntilText(q.date)}</p>
+    <h2 id="details-title">${escapeHtml(q.subject)}</h2>
+    ${factsHtml([
+      ['التاريخ', longDate(q.date)],
+      ['الوقت', `${timeText(q.from)} – ${timeText(q.to)}`],
+      ['المدة', durationText(toMinutes(q.to) - toMinutes(q.from))],
+      q.note && ['ملاحظة', escapeHtml(q.note)],
+    ])}
+    ${zoomHtml(q.subject)}
+    <button class="btn btn-block" type="button" data-action="close-details">تمام</button>`;
+  $('details').showModal();
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('dialog')) return;
+  const quiz = e.target.closest('[data-quiz]');
+  if (quiz) return openQuizDetails(quiz.dataset.quiz);
+  const lec = e.target.closest('.lec[data-id]');
   if (lec) return openDetails(lec.dataset.id);
   if (e.target.closest('[data-action="retry"]')) load();
 });

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css?v=5">
+  <link rel="stylesheet" href="assets/style.css?v=6">
 </head>
 <body class="admin">
   <header class="hero hero-sm">
@@ -55,6 +55,12 @@
         </div>
 
         <div id="lecture-list"></div>
+
+        <div class="toolbar toolbar-quiz">
+          <h2 id="quiz-title">الكويزات</h2>
+          <button class="btn btn-quiz" type="button" id="add-quiz-btn">+ إضافة كويز</button>
+        </div>
+        <div id="quiz-list"></div>
 
         <details class="card tools" id="zoom-card" open>
           <summary>روابط الزوم</summary>
@@ -116,9 +122,14 @@
         <div class="chips chips-scroll" id="subject-chips"></div>
       </div>
 
-      <div class="field">
+      <div class="field" id="day-field">
         <span class="label">اليوم</span>
         <div class="chips" id="day-chips" role="radiogroup" aria-label="اليوم"></div>
+      </div>
+
+      <div class="field" id="date-field" hidden>
+        <span class="label">التاريخ</span>
+        <div class="chips chips-scroll date-chips" id="date-chips" role="radiogroup" aria-label="التاريخ"></div>
       </div>
 
       <div class="field">
@@ -137,11 +148,20 @@
         </div>
       </div>
 
+      <div class="field" id="attendance-field">
+        <span class="label">الحضور</span>
+        <div class="chips" id="attendance-chips" role="radiogroup" aria-label="الحضور"></div>
+      </div>
+
       <p class="summary" id="summary"></p>
 
       <details class="extra" id="extra">
-        <summary>القاعة والمحاضر (اختياري)</summary>
-        <div class="field-row">
+        <summary id="extra-title">ملاحظة والقاعة والمحاضر (اختياري)</summary>
+        <div class="field">
+          <label for="f-note">ملاحظة</label>
+          <input id="f-note" type="text" autocomplete="off" maxlength="140">
+        </div>
+        <div class="field-row" id="place-row">
           <div class="field">
             <label for="f-room">القاعة</label>
             <input id="f-room" type="text" autocomplete="off">
@@ -190,7 +210,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="assets/common.js?v=5"></script>
-  <script src="assets/admin.js?v=5"></script>
+  <script src="assets/common.js?v=6"></script>
+  <script src="assets/admin.js?v=6"></script>
 </body>
 </html>

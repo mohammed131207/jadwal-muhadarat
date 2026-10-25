@@ -18,6 +18,11 @@
   --clash: #EF4444;
   --clash-soft: #FEE2E2;
   --clash-text: #B91C1C;
+  --quiz: #F59E0B;
+  --quiz-soft: #FEF3C7;
+  --quiz-text: #92400E;
+  --ok-soft: #DCFCE7;
+  --ok-text: #166534;
   --tint: 15%;
   --ink: 68%;
   --ink-base: #000;
@@ -48,6 +53,10 @@
     --clash: #F87171;
     --clash-soft: rgb(239 68 68 / 0.16);
     --clash-text: #FCA5A5;
+    --quiz-soft: rgb(245 158 11 / 0.16);
+    --quiz-text: #FCD34D;
+    --ok-soft: rgb(34 197 94 / 0.15);
+    --ok-text: #86EFAC;
     --tint: 26%;
     --ink: 30%;
     --ink-base: #fff;
@@ -433,6 +442,103 @@ button.clash-dot::before {
 .zoom-meta b { color: var(--text); font-weight: 600; }
 .zoom-meta.is-empty { opacity: 0.8; }
 
+/* ---------- الكويزات والحضور ---------- */
+.day-head .day-date {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.lec.is-quiz {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--c) 12%, transparent) 7px 14px),
+    color-mix(in srgb, var(--c) var(--tint), var(--surface));
+  outline: 1.5px dashed var(--c);
+  outline-offset: -5px;
+}
+
+.lec-name .quiz-badge { margin-inline: 0 3px; }
+.quiz-badge {
+  display: inline-block;
+  margin-inline-start: 4px;
+  padding: 0 7px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: #1F1500;
+  background: var(--quiz);
+  border-radius: 999px;
+}
+
+.quiz-card { margin-bottom: 14px; padding: 14px 14px 8px; }
+.quiz-card-title { margin: 0 4px 6px; font-size: 1rem; font-weight: 700; }
+
+.quiz-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 4px;
+  font: inherit;
+  color: var(--text);
+  text-align: start;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  cursor: pointer;
+}
+.quiz-row:first-of-type { border-top: 0; }
+.quiz-date {
+  display: grid;
+  place-items: center;
+  padding: 6px 4px;
+  line-height: 1.25;
+  color: var(--quiz-text);
+  background: var(--quiz-soft);
+  border-radius: 12px;
+}
+.quiz-date b { font-size: 0.8rem; }
+.quiz-date small { font-size: 0.75rem; }
+.quiz-info strong { display: block; font-size: 0.98rem; overflow-wrap: anywhere; }
+.quiz-info span { font-size: 0.82rem; color: var(--muted); }
+.quiz-when { font-size: 0.82rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.quiz-row.is-soon .quiz-when { color: var(--quiz-text); }
+
+.quiz-note {
+  margin: -4px 0 12px;
+  padding: 9px 12px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--quiz-text);
+  background: var(--quiz-soft);
+  border-radius: 10px;
+}
+
+.now-quiz {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 0 9px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.8;
+  vertical-align: 3px;
+  color: #1F1500;
+  background: var(--quiz);
+  border-radius: 999px;
+}
+
+.att-tag {
+  display: inline-block;
+  padding: 1px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 999px;
+}
+.att-required { color: var(--clash-text); background: var(--clash-soft); }
+.att-optional { color: var(--ok-text); background: var(--ok-soft); }
+
 /* ---------- التذييل ---------- */
 .foot {
   display: flex;
@@ -774,6 +880,30 @@ details.extra summary {
 .lec-info strong { display: block; font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
 .lec-info span { font-size: 0.85rem; color: var(--muted); }
 .lec-actions { display: flex; gap: 6px; }
+.lec-extra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; }
+.lec-extra .att-tag { font-size: 0.75rem; }
+.lec-note { font-size: 0.82rem; color: var(--muted); }
+
+.toolbar-quiz { margin-top: 18px; }
+.btn.btn-quiz { color: #1F1500; background: var(--quiz); border-color: var(--quiz); }
+.btn.btn-quiz:hover { background: var(--quiz); filter: brightness(1.05); }
+.quiz-item .lec-bar {
+  background: repeating-linear-gradient(to bottom, var(--quiz) 0 6px, transparent 6px 10px);
+}
+.quiz-item .quiz-when { font-size: 0.75rem; color: var(--quiz-text); background: var(--quiz-soft); padding: 1px 10px; border-radius: 999px; }
+.quiz-item.is-ended { opacity: 0.55; }
+.ended-quizzes summary { padding: 10px 0; font-size: 0.88rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+
+.date-chips .chip {
+  display: grid;
+  place-items: center;
+  min-width: 72px;
+  min-height: 52px;
+  padding: 4px 10px;
+  line-height: 1.25;
+}
+.date-top { font-size: 0.82rem; font-weight: 600; }
+.date-num { font-size: 0.78rem; opacity: 0.8; }
 
 @media (max-width: 480px) {
   .lec-item { grid-template-columns: 4px minmax(0, 1fr); row-gap: 8px; }

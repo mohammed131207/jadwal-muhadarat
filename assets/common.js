@@ -99,15 +99,74 @@ function conflictHtml(others) {
   return `في تعارض: متداخلة مع ${list}`;
 }
 
+function sortQuizzes(a, b) {
+  return a.date.localeCompare(b.date) || toMinutes(a.from) - toMinutes(b.from);
+}
+
+/* ---------- تواريخ الكويزات ---------- */
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function dateKey(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function parseDate(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addDays(d, n) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+/* أول يوم بالأسبوع الحالي (السبت) */
+function weekStart(now = new Date()) {
+  return addDays(now, -((now.getDay() + 1) % 7));
+}
+
+function dayKeyOf(dateStr) {
+  return todayKey(parseDate(dateStr));
+}
+
+function shortDate(dateStr) {
+  const d = parseDate(dateStr);
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+function longDate(dateStr) {
+  return parseDate(dateStr).toLocaleDateString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function daysUntil(dateStr, now = new Date()) {
+  return Math.round((parseDate(dateStr) - addDays(now, 0)) / 86400000);
+}
+
+function daysUntilText(dateStr, now = new Date()) {
+  const n = daysUntil(dateStr, now);
+  if (n < 0) return 'خلص';
+  if (n === 0) return 'اليوم';
+  if (n === 1) return 'بكرة';
+  return `بعد ${countWord(n, 'يوم', 'يومين', 'أيام', 'يوم')}`;
+}
+
+function quizEnded(q, now = new Date()) {
+  const today = dateKey(now);
+  return q.date < today || (q.date === today && now.getHours() * 60 + now.getMinutes() >= toMinutes(q.to));
+}
+
 function makeId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 const TIME_RE = /^\d{2}:\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ATTENDANCE = { required: 'إجباري', optional: 'مش إجباري' };
 
 /* يرجّع نسخة نظيفة من البيانات. بيقبل كمان الشكل القديم اللي كان فيه دفعات */
 function normalizeData(raw) {
-  const out = { updatedAt: null, title: DEFAULT_TITLE, subtitle: '', lectures: [], zoom: {} };
+  const out = { updatedAt: null, title: DEFAULT_TITLE, subtitle: '', lectures: [], quizzes: [], zoom: {} };
   if (!raw || typeof raw !== 'object') return out;
   out.updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : null;
 
@@ -134,8 +193,23 @@ function normalizeData(raw) {
       subject: String(l.subject).trim(),
       room: String(l.room || '').trim(),
       doctor: String(l.doctor || '').trim(),
+      attendance: ATTENDANCE[l.attendance] ? l.attendance : '',
+      note: String(l.note || '').trim(),
     }))
     .sort(sortLectures);
+
+  // الكويزات بتاريخ محدد، مش أسبوعية
+  out.quizzes = (Array.isArray(raw.quizzes) ? raw.quizzes : [])
+    .filter((q) => q && DATE_RE.test(q.date) && TIME_RE.test(q.from) && TIME_RE.test(q.to) && String(q.subject || '').trim())
+    .map((q) => ({
+      id: String(q.id || makeId()),
+      date: q.date,
+      from: q.from,
+      to: q.to,
+      subject: String(q.subject).trim(),
+      note: String(q.note || '').trim(),
+    }))
+    .sort(sortQuizzes);
 
   // روابط الزوم لكل مادة: { اسم المادة: { url, updatedAt } }
   if (raw.zoom && typeof raw.zoom === 'object') {

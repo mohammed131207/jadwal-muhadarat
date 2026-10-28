@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-27T16:31:14.525Z",
+  "updatedAt": "2026-10-28T16:09:15.110Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
@@ -134,17 +134,19 @@
       "doctor": "",
       "attendance": "required",
       "note": ""
-    }
-  ],
-  "quizzes": [
+    },
     {
-      "id": "mvqwjafpxmfmd",
-      "date": "2026-10-28",
-      "from": "10:00",
+      "id": "mvsb7qnw58o31",
+      "day": "thu",
+      "from": "12:00",
       "to": "14:00",
-      "subject": "قواعد البيانات",
-      "note": "مدة الكويز دقيقة ونصف، بتكون من 3 أسئلة اختيار من متعدد. مادة الكويز في اول شابترين"
+      "subject": "مقدمة في الذكاء الاصطناعي عملي",
+      "room": "",
+      "doctor": "",
+      "attendance": "required",
+      "note": ""
     }
   ],
+  "quizzes": [],
   "zoom": {}
 }

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-28T16:10:23.198Z",
+  "updatedAt": "2026-11-01T17:07:51.206Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
@@ -46,28 +46,6 @@
       "doctor": "",
       "attendance": "optional",
       "note": ""
-    },
-    {
-      "id": "mvofj5pl5zqef",
-      "day": "mon",
-      "from": "10:00",
-      "to": "11:30",
-      "subject": "مقدمة في الذكاء الاصطناعي عملي",
-      "room": "",
-      "doctor": "",
-      "attendance": "required",
-      "note": "محاضرة تعويضية عن الاسبوع الماضي"
-    },
-    {
-      "id": "mvofk4o4y15n4",
-      "day": "mon",
-      "from": "13:00",
-      "to": "14:30",
-      "subject": "هياكل بيانات عملي",
-      "room": "",
-      "doctor": "",
-      "attendance": "required",
-      "note": "محاضرة تعويضية عن الاسبوع الماضي"
     },
     {
       "id": "mvfkmvjopgoup",

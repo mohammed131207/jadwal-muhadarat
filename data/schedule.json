@@ -1,19 +1,8 @@
 {
-  "updatedAt": "2026-11-02T06:58:36.801Z",
+  "updatedAt": "2026-11-06T19:27:50.193Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
-    {
-      "id": "mvm2oqxuvn4uq",
-      "day": "sat",
-      "from": "10:30",
-      "to": "11:30",
-      "subject": "قواعد البيانات",
-      "room": "",
-      "doctor": "",
-      "attendance": "required",
-      "note": ""
-    },
     {
       "id": "mvfr6u3q9vrbv",
       "day": "sat",

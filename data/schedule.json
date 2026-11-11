@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-06T19:27:50.193Z",
+  "updatedAt": "2026-11-11T08:30:18.007Z",
   "title": "جدول المحاضرات",
   "subtitle": "دفعة 2025",
   "lectures": [
@@ -78,17 +78,6 @@
       "room": "",
       "doctor": "",
       "attendance": "required",
-      "note": ""
-    },
-    {
-      "id": "mvqnqxm0nt7sy",
-      "day": "wed",
-      "from": "10:00",
-      "to": "11:00",
-      "subject": "الكترونيات",
-      "room": "",
-      "doctor": "",
-      "attendance": "optional",
       "note": ""
     },
     {
